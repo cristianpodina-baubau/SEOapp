@@ -694,6 +694,23 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
   const [isDemoMode, setIsDemoMode] = useState(true);
+  
+  // Custom Multi-User Auth State
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('seoapp_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [authUsername, setAuthUsername] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [usersList, setUsersList] = useState([]);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserUsername, setNewUserUsername] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserRole, setNewUserRole] = useState('editor');
+  const [isAddingUser, setIsAddingUser] = useState(false);
 
   // Crawler State
   const [targetUrl, setTargetUrl] = useState('https://example.com');
@@ -1339,6 +1356,30 @@ export default function App() {
           localStorage.setItem('google_user', JSON.stringify(loggedUser));
           setIsDemoMode(false);
           setActiveView('rankings');
+
+          // Log in custom user session using Google Email
+          fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ googleEmail: loggedUser.email })
+          })
+          .then(r => r.json())
+          .then(authRes => {
+            if (authRes.success) {
+              setCurrentUser(authRes.user);
+              localStorage.setItem('seoapp_user', JSON.stringify(authRes.user));
+            } else {
+              alert(authRes.error || 'Acest email Google nu are acces în aplicație. Contactați administratorul.');
+              // Reset google session
+              setGoogleUser(null);
+              setGoogleTokens(null);
+              localStorage.removeItem('google_user');
+              localStorage.removeItem('google_tokens');
+            }
+          })
+          .catch(e => {
+            console.error('Local auth matching failed:', e);
+          });
         }
         window.history.replaceState({}, document.title, window.location.pathname);
       })
@@ -1347,6 +1388,13 @@ export default function App() {
       });
     }
   }, []);
+
+  // Fetch custom users if admin
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'admin') {
+      fetchUsers();
+    }
+  }, [currentUser]);
 
   // Fetch Google Dashboard Data
   useEffect(() => {
@@ -1376,6 +1424,110 @@ export default function App() {
     setGscData(null);
     setGaData(null);
     setAdsData(null);
+  };
+
+  const handleUserLogin = async (e) => {
+    e?.preventDefault();
+    if (!authUsername || !authPassword) {
+      setAuthError('Vă rugăm introduceți numele de utilizator și parola.');
+      return;
+    }
+    setIsLoggingIn(true);
+    setAuthError('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: authUsername, password: authPassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCurrentUser(data.user);
+        localStorage.setItem('seoapp_user', JSON.stringify(data.user));
+        setAuthUsername('');
+        setAuthPassword('');
+      } else {
+        setAuthError(data.error || 'Nume de utilizator sau parolă incorectă.');
+      }
+    } catch (err) {
+      setAuthError('Eroare de conexiune la server.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleUserLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('seoapp_user');
+    handleLogout();
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      if (res.ok) {
+        setUsersList(data);
+      }
+    } catch (err) {
+      console.error('Eroare la preluarea utilizatorilor:', err);
+    }
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    if (!newUserName || !newUserUsername || !newUserPassword) {
+      alert('Vă rugăm completați toate câmpurile obligatorii.');
+      return;
+    }
+    setIsAddingUser(true);
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newUserName,
+          username: newUserUsername,
+          password: newUserPassword,
+          email: newUserEmail,
+          role: newUserRole
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Utilizator creat cu succes!');
+        setNewUserName('');
+        setNewUserUsername('');
+        setNewUserPassword('');
+        setNewUserEmail('');
+        setNewUserRole('editor');
+        fetchUsers();
+      } else {
+        alert(data.error || 'Eroare la crearea utilizatorului.');
+      }
+    } catch (err) {
+      alert('Eroare de conexiune.');
+    } finally {
+      setIsAddingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (id) => {
+    if (!window.confirm('Sigur doriți să ștergeți acest utilizator?')) return;
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Utilizator șters!');
+        fetchUsers();
+      } else {
+        alert(data.error || 'Eroare la ștergerea utilizatorului.');
+      }
+    } catch (err) {
+      alert('Eroare de conexiune.');
+    }
   };
 
   // ==========================================
@@ -2174,6 +2326,104 @@ export default function App() {
     ];
   };
 
+  if (!currentUser) {
+    return (
+      <div className="login-container" style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)',
+        color: '#fff',
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        padding: '20px'
+      }}>
+        <div className="glass-card" style={{
+          width: '100%',
+          maxWidth: '420px',
+          padding: '40px',
+          borderRadius: '16px',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          textAlign: 'center',
+          background: 'rgba(255, 255, 255, 0.02)'
+        }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '28px' }}>
+            <Layers size={32} style={{ color: 'var(--secondary)' }} />
+            <span style={{ fontSize: '1.8rem', fontWeight: '800', letterSpacing: '-0.5px' }}>SEOapp Premium</span>
+          </div>
+
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '8px' }}>Autentificare în Platformă</h2>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '24px' }}>
+            Introduceți datele contului de utilizator sau conectați-vă cu contul Google autorizat.
+          </p>
+
+          {authError && (
+            <div style={{
+              padding: '12px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid var(--error)',
+              borderRadius: '8px',
+              color: 'var(--error)',
+              fontSize: '0.8rem',
+              marginBottom: '20px',
+              textAlign: 'left'
+            }}>
+              {authError}
+            </div>
+          )}
+
+          <form onSubmit={handleUserLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+                NUME UTILIZATOR (USERNAME)
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Ex: cristianpodina"
+                value={authUsername}
+                onChange={(e) => setAuthUsername(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+                PAROLĂ
+              </label>
+              <input
+                type="password"
+                className="input-field"
+                placeholder="••••••••"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', marginTop: '8px', fontWeight: '700' }} disabled={isLoggingIn}>
+              {isLoggingIn ? 'Se conectează...' : 'Conectează-te'}
+            </button>
+          </form>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }}></div>
+            <span>SAU</span>
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }}></div>
+          </div>
+
+          {/* Google Auth Button */}
+          <button className="btn btn-google" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px', fontWeight: '600' }} onClick={handleGoogleLogin}>
+            <LogIn size={18} /> Autentificare cu Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-layout">
       {/* SIDEBAR NAVIGATION */}
@@ -2354,37 +2604,44 @@ export default function App() {
             <Settings />
             <span>Setări</span>
           </div>
-        </nav>
 
-        <div className="sidebar-footer">
-          {googleUser ? (
-            <div className="user-profile">
-              <img src={googleUser.avatar} className="user-avatar" alt="Avatar" />
-              <div className="user-info">
-                <span className="user-name">{googleUser.name}</span>
-                <span className="user-email">{googleUser.email}</span>
-                <span 
-                  onClick={() => {
-                    handleLogout();
-                    setIsMobileMenuOpen(false);
-                  }} 
-                  style={{ color: 'var(--error)', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}
-                >
-                  <LogOut size={12} /> Deconectare
-                </span>
-              </div>
-            </div>
-          ) : (
-            <button 
-              className="btn btn-outline" 
-              style={{ width: '100%', padding: '10px' }} 
+          {currentUser?.role === 'admin' && (
+            <div 
+              className={`menu-item ${activeView === 'users' ? 'active' : ''}`}
               onClick={() => {
-                handleGoogleLogin();
+                setActiveView('users');
+                fetchUsers();
                 setIsMobileMenuOpen(false);
               }}
             >
-              <LogIn size={16} /> Conectează Google
-            </button>
+              <Users />
+              <span>Utilizatori</span>
+            </div>
+          )}
+        </nav>
+
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 'bold', color: '#000', flexShrink: 0 }}>
+              {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <div className="user-info" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', overflow: 'hidden' }}>
+              <span className="user-name" style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser?.name}</span>
+              <span className="user-email" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{currentUser?.username} ({currentUser?.role === 'admin' ? 'Admin' : 'Editor'})</span>
+              <span 
+                onClick={handleUserLogout} 
+                style={{ color: 'var(--error)', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', fontWeight: '600' }}
+              >
+                <LogOut size={11} /> Deconectare
+              </span>
+            </div>
+          </div>
+
+          {googleUser && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '6px', fontSize: '0.7rem', color: 'var(--secondary)' }}>
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--secondary)', flexShrink: 0 }}></div>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Google: {googleUser.email}</span>
+            </div>
           )}
         </div>
       </aside>
@@ -6556,6 +6813,156 @@ export default function App() {
               >
                  Șterge Proiectul și Toate Datele
               </button>
+            </div>
+          </div>
+        )}
+
+        {activeView === 'users' && currentUser?.role === 'admin' && (
+          <div>
+            <div className="header-row">
+              <div className="page-title">
+                <h1>Management Utilizatori</h1>
+                <p>Creați conturi personalizate pentru alți colaboratori care pot vizualiza și edita proiectele.</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px', alignItems: 'start', textAlign: 'left' }}>
+              {/* Users List Card */}
+              <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '16px', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={20} color="var(--primary)" />
+                  Utilizatori Înregistrați ({usersList.length})
+                </h3>
+
+                <div className="table-wrapper">
+                  <table className="custom-table">
+                    <thead>
+                      <tr>
+                        <th>Nume Complet</th>
+                        <th>Nume Utilizator</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th style={{ textAlign: 'center' }}>Acțiuni</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usersList.map((user) => (
+                        <tr key={user.id}>
+                          <td style={{ fontWeight: '600', color: '#fff' }}>{user.name}</td>
+                          <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>@{user.username}</td>
+                          <td style={{ color: 'var(--text-secondary)' }}>{user.email || '-'}</td>
+                          <td>
+                            <span className={`status-badge ${user.role === 'admin' ? 'status-success' : 'status-warning'}`} style={{ textTransform: 'capitalize' }}>
+                              {user.role === 'admin' ? 'Administrator' : 'Editor'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {user.id !== 'usr_admin' ? (
+                              <button 
+                                className="btn btn-outline" 
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', borderColor: 'var(--error)', color: 'var(--error)' }}
+                                onClick={() => handleDeleteUser(user.id)}
+                              >
+                                Șterge
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Protejat</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Create User Form Card */}
+              <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '16px', color: '#fff' }}>
+                  Adaugă Utilizator Nou
+                </h3>
+
+                <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+                      NUME COMPLET
+                    </label>
+                    <input 
+                      type="text" 
+                      className="input-field" 
+                      placeholder="Ex: Popescu Ion"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+                      NUME UTILIZATOR (PENTRU LOGIN)
+                    </label>
+                    <input 
+                      type="text" 
+                      className="input-field" 
+                      placeholder="Ex: ionpopescu"
+                      value={newUserUsername}
+                      onChange={(e) => setNewUserUsername(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+                      PAROLĂ CONT
+                    </label>
+                    <input 
+                      type="password" 
+                      className="input-field" 
+                      placeholder="Minim 6 caractere"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+                      ADRESĂ EMAIL (OPȚIONAL)
+                    </label>
+                    <input 
+                      type="email" 
+                      className="input-field" 
+                      placeholder="Ex: ion@baubaudesign.ro"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+                      ROL CONT
+                    </label>
+                    <select 
+                      className="select-field" 
+                      style={{ width: '100%', padding: '10px 14px' }}
+                      value={newUserRole}
+                      onChange={(e) => setNewUserRole(e.target.value)}
+                    >
+                      <option value="editor">Editor (Modificări & Vizualizare)</option>
+                      <option value="admin">Administrator (Control Complet)</option>
+                    </select>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    style={{ width: '100%', padding: '12px', marginTop: '8px', fontWeight: '600' }}
+                    disabled={isAddingUser}
+                  >
+                    {isAddingUser ? 'Se salvează...' : 'Creează Utilizator'}
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
         )}

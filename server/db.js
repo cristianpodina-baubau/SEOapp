@@ -54,3 +54,31 @@ export function deleteProjectFiles(projectId) {
     }
   }
 }
+
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+
+export function getUsers() {
+  if (!fs.existsSync(USERS_FILE)) {
+    const defaultUsers = [
+      {
+        id: 'usr_admin',
+        name: 'Cristian Podina',
+        username: 'cristianpodina',
+        password: 'adminpassword123',
+        role: 'admin',
+        email: 'cristianpodina@gmail.com'
+      }
+    ];
+    fs.writeFileSync(USERS_FILE, JSON.stringify(defaultUsers, null, 2));
+    return defaultUsers;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveUsers(users) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}

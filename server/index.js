@@ -19,7 +19,9 @@ import {
   saveProjects,
   getProjectData,
   saveProjectData,
-  deleteProjectFiles
+  deleteProjectFiles,
+  getUsers,
+  saveUsers
 } from './db.js';
 
 dotenv.config();
@@ -213,6 +215,126 @@ app.post('/api/auth/google/callback', async (req, res) => {
     res.json({ tokens, user });
   } catch (error) {
     console.error('Error exchanging code:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// AUTHENTICATION & USER MANAGEMENT API
+// ==========================================
+
+// Login route
+app.post('/api/auth/login', (req, res) => {
+  const { username, password, googleEmail } = req.body;
+  const users = getUsers();
+
+  // Handle Google Login matching email
+  if (googleEmail) {
+    if (googleEmail.toLowerCase() === 'cristianpodina@gmail.com') {
+      let adminUser = users.find(u => u.email?.toLowerCase() === 'cristianpodina@gmail.com' || u.id === 'usr_admin');
+      if (!adminUser) {
+        adminUser = {
+          id: 'usr_admin',
+          name: 'Cristian Podina',
+          username: 'cristianpodina',
+          role: 'admin',
+          email: 'cristianpodina@gmail.com'
+        };
+        users.push(adminUser);
+        saveUsers(users);
+      }
+      return res.json({ success: true, user: adminUser });
+    }
+
+    const matchedUser = users.find(u => u.email?.toLowerCase() === googleEmail.toLowerCase());
+    if (matchedUser) {
+      return res.json({ success: true, user: matchedUser });
+    }
+
+    return res.status(401).json({ error: 'Acest cont Google nu are acces în aplicație. Contactați administratorul.' });
+  }
+
+  // Handle Username + Password Login
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Numele de utilizator și parola sunt obligatorii.' });
+  }
+
+  const matchedUser = users.find(
+    u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
+  );
+
+  if (matchedUser) {
+    const { password: _, ...userWithoutPassword } = matchedUser;
+    return res.json({ success: true, user: userWithoutPassword });
+  }
+
+  res.status(401).json({ error: 'Nume de utilizator sau parolă incorectă.' });
+});
+
+// Get all users
+app.get('/api/users', (req, res) => {
+  try {
+    const users = getUsers();
+    const safeUsers = users.map(({ password: _, ...u }) => u);
+    res.json(safeUsers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create new user
+app.post('/api/users', (req, res) => {
+  const { name, username, password, role, email } = req.body;
+
+  if (!name || !username || !password) {
+    return res.status(400).json({ error: 'Numele, numele de utilizator și parola sunt obligatorii.' });
+  }
+
+  try {
+    const users = getUsers();
+
+    if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+      return res.status(400).json({ error: 'Numele de utilizator este deja folosit.' });
+    }
+
+    const newUser = {
+      id: 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      name: name.trim(),
+      username: username.trim().toLowerCase(),
+      password: password,
+      role: role || 'editor',
+      email: email ? email.trim().toLowerCase() : ''
+    };
+
+    users.push(newUser);
+    saveUsers(users);
+
+    const { password: _, ...safeUser } = newUser;
+    res.status(201).json(safeUser);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete user
+app.delete('/api/users/:id', (req, res) => {
+  const { id } = req.params;
+
+  if (id === 'usr_admin') {
+    return res.status(400).json({ error: 'Nu puteți șterge administratorul principal.' });
+  }
+
+  try {
+    const users = getUsers();
+    const filtered = users.filter(u => u.id !== id);
+
+    if (users.length === filtered.length) {
+      return res.status(404).json({ error: 'Utilizatorul nu a fost găsit.' });
+    }
+
+    saveUsers(filtered);
+    res.json({ message: 'Utilizator șters cu succes.' });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
