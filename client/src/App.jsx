@@ -6426,7 +6426,7 @@ export default function App() {
                   {/* Title row */}
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <BarChart2 size={20} style={{ color: 'var(--primary)' }} />
-                    <h3 style={{ fontSize: '1.10rem', fontWeight: '700', color: '#fff', margin: 0 }}>Analiză Autoritate & Competitori (Stil Ahrefs / SEMrush)</h3>
+                    <h3 style={{ fontSize: '1.10rem', fontWeight: '700', color: '#fff', margin: 0 }}>Analiză Autoritate & Competitori</h3>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
@@ -6456,7 +6456,7 @@ export default function App() {
                       <div>
                         <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '4px' }}>DOMAIN RATING (DR)</h4>
                         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                          Scor de autoritate bazat pe backlinks (Ahrefs style). Rating optim: &gt; 40.
+                          Scor de autoritate estimat pe baza profilului de linkuri. Rating optim: &gt; 40.
                         </p>
                       </div>
                     </div>
@@ -6514,7 +6514,7 @@ export default function App() {
 
                     {/* Competitors Overlap */}
                     <div className="glass-card" style={{ padding: '20px' }}>
-                      <h4 style={{ fontSize: '0.92rem', fontWeight: '700', marginBottom: '16px' }}>Concurenți Top în Search (SEMrush Overlap)</h4>
+                      <h4 style={{ fontSize: '0.92rem', fontWeight: '700', marginBottom: '16px' }}>Analiză Suprapunere Competitori în Căutări</h4>
                       <div className="table-wrapper">
                         <table className="custom-table" style={{ background: 'transparent' }}>
                           <thead>
