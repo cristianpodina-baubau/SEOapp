@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import axios from 'axios';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { SiteCrawler } from './crawler.js';
 import { 
   getGoogleAuthUrl, 
@@ -371,6 +373,21 @@ app.post('/api/projects/:id/data', (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static assets from React client build
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+// Wildcard route to serve React's index.html for frontend routing
+app.get('*', (req, res) => {
+  // If request is an API request, return 404 instead of serving HTML
+  if (req.originalUrl.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
 // Start Server
