@@ -82,3 +82,20 @@ export function getUsers() {
 export function saveUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
+
+const GOOGLE_TOKENS_FILE = path.join(DATA_DIR, 'google_tokens.json');
+
+export function getAdminTokens() {
+  if (!fs.existsSync(GOOGLE_TOKENS_FILE)) {
+    return null;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(GOOGLE_TOKENS_FILE, 'utf8'));
+  } catch (e) {
+    return null;
+  }
+}
+
+export function saveAdminTokens(tokens) {
+  fs.writeFileSync(GOOGLE_TOKENS_FILE, JSON.stringify(tokens, null, 2));
+}

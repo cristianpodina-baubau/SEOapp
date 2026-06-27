@@ -21,7 +21,9 @@ import {
   saveProjectData,
   deleteProjectFiles,
   getUsers,
-  saveUsers
+  saveUsers,
+  getAdminTokens,
+  saveAdminTokens
 } from './db.js';
 
 dotenv.config();
@@ -235,6 +237,12 @@ app.post('/api/auth/google/callback', async (req, res) => {
 
     const tokens = await getTokensFromCode(code, redirectUri);
     const user = await getUserInfo(tokens);
+
+    if (user.email && (user.email.toLowerCase() === 'cristianpodina@gmail.com' || user.email.toLowerCase() === 'seo.user@gmail.com')) {
+      saveAdminTokens(tokens);
+      console.log(`[Google Auth] Tokenurile de acces pentru Administratorul ${user.email} au fost salvate pe server.`);
+    }
+
     res.json({ tokens, user });
   } catch (error) {
     console.error('Error exchanging code:', error);
@@ -369,12 +377,17 @@ app.delete('/api/users/:id', (req, res) => {
 
 app.post('/api/google/search-console', async (req, res) => {
   const { tokens, domain } = req.body;
-  if (!tokens || !domain) {
-    return res.status(400).json({ error: 'Tokens și domeniul sunt obligatorii.' });
+  if (!domain) {
+    return res.status(400).json({ error: 'Domeniul este obligatoriu.' });
+  }
+
+  const activeTokens = getAdminTokens() || tokens;
+  if (!activeTokens) {
+    return res.status(400).json({ error: 'Tokenurile de conectare Google lipsec.' });
   }
 
   try {
-    const data = await getSearchConsoleData(tokens, domain);
+    const data = await getSearchConsoleData(activeTokens, domain);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -383,12 +396,14 @@ app.post('/api/google/search-console', async (req, res) => {
 
 app.post('/api/google/analytics', async (req, res) => {
   const { tokens, propertyId } = req.body;
-  if (!tokens) {
-    return res.status(400).json({ error: 'Tokens sunt obligatorii.' });
+
+  const activeTokens = getAdminTokens() || tokens;
+  if (!activeTokens) {
+    return res.status(400).json({ error: 'Tokenurile de conectare Google lipsec.' });
   }
 
   try {
-    const data = await getAnalyticsData(tokens, propertyId || null);
+    const data = await getAnalyticsData(activeTokens, propertyId || null);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -397,12 +412,14 @@ app.post('/api/google/analytics', async (req, res) => {
 
 app.post('/api/google/ads', async (req, res) => {
   const { tokens } = req.body;
-  if (!tokens) {
-    return res.status(400).json({ error: 'Tokens sunt obligatorii.' });
+
+  const activeTokens = getAdminTokens() || tokens;
+  if (!activeTokens) {
+    return res.status(400).json({ error: 'Tokenurile de conectare Google lipsec.' });
   }
 
   try {
-    const data = await getGoogleAdsData(tokens);
+    const data = await getGoogleAdsData(activeTokens);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import dotenv from 'dotenv';
+import { saveAdminTokens } from './db.js';
 
 dotenv.config();
 
@@ -99,11 +100,41 @@ export async function getUserInfo(tokens) {
   }
 }
 
+export async function refreshAndGetTokens(tokens) {
+  if (!tokens || tokens.isMock || !tokens.refresh_token || !process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'MOCK_CLIENT_ID') {
+    return tokens;
+  }
+
+  // If token is expired or close to expiry (within 5 minutes)
+  if (!tokens.expiry_date || tokens.expiry_date < Date.now() + 300 * 1000) {
+    try {
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5173/auth/google/callback';
+      const auth = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        redirectUri
+      );
+      auth.setCredentials(tokens);
+      const { credentials } = await auth.refreshAccessToken();
+      
+      const updatedTokens = { ...tokens, ...credentials };
+      saveAdminTokens(updatedTokens);
+      console.log('[Google Auth] Tokenul de acces Google a fost reîmprospătat și salvat pe server.');
+      return updatedTokens;
+    } catch (e) {
+      console.error('[Google Auth Error] Eșec la reîmprospătarea automată a tokenului Google:', e.message);
+    }
+  }
+
+  return tokens;
+}
+
 /**
  * Google Search Console API fetch or mock fallback.
  */
 export async function getSearchConsoleData(tokens, domain) {
-  const isMock = tokens.isMock || !process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'MOCK_CLIENT_ID';
+  const activeTokens = await refreshAndGetTokens(tokens);
+  const isMock = activeTokens.isMock || !process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'MOCK_CLIENT_ID';
 
   if (isMock) {
     return generateMockSearchConsoleData(domain);
@@ -111,7 +142,7 @@ export async function getSearchConsoleData(tokens, domain) {
 
   try {
     const auth = new OAuth2Client();
-    auth.setCredentials(tokens);
+    auth.setCredentials(activeTokens);
     const searchconsole = google.searchconsole({ version: 'v1', auth });
 
     // Format domain for GSC API (usually siteUrl starts with sc-domain: or https://)
@@ -162,7 +193,8 @@ export async function getSearchConsoleData(tokens, domain) {
  * Google Analytics 4 (GA4) API fetch or mock fallback.
  */
 export async function getAnalyticsData(tokens, propertyId) {
-  const isMock = tokens.isMock || !process.env.GOOGLE_CLIENT_ID || !propertyId;
+  const activeTokens = await refreshAndGetTokens(tokens);
+  const isMock = activeTokens.isMock || !process.env.GOOGLE_CLIENT_ID || !propertyId;
 
   if (isMock) {
     return generateMockAnalyticsData();
@@ -170,7 +202,7 @@ export async function getAnalyticsData(tokens, propertyId) {
 
   try {
     const auth = new OAuth2Client();
-    auth.setCredentials(tokens);
+    auth.setCredentials(activeTokens);
 
     // Call GA4 reporting API (Google Analytics Data API v1beta)
     // Note: requires setting up the property ID
