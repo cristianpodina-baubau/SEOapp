@@ -230,15 +230,16 @@ app.post('/api/auth/login', (req, res) => {
 
   // Handle Google Login matching email
   if (googleEmail) {
-    if (googleEmail.toLowerCase() === 'cristianpodina@gmail.com') {
-      let adminUser = users.find(u => u.email?.toLowerCase() === 'cristianpodina@gmail.com' || u.id === 'usr_admin');
+    const emailLower = googleEmail.toLowerCase();
+    if (emailLower === 'cristianpodina@gmail.com' || emailLower === 'seo.user@gmail.com') {
+      let adminUser = users.find(u => u.email?.toLowerCase() === emailLower || u.id === 'usr_admin');
       if (!adminUser) {
         adminUser = {
           id: 'usr_admin',
           name: 'Cristian Podina',
           username: 'cristianpodina',
           role: 'admin',
-          email: 'cristianpodina@gmail.com'
+          email: emailLower
         };
         users.push(adminUser);
         saveUsers(users);

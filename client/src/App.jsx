@@ -697,9 +697,13 @@ export default function App() {
   
   // Custom Multi-User Auth State
   const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('seoapp_user');
-    return saved ? JSON.parse(saved) : null;
+    const savedLocal = localStorage.getItem('seoapp_user');
+    if (savedLocal) return JSON.parse(savedLocal);
+    const savedSession = sessionStorage.getItem('seoapp_user');
+    if (savedSession) return JSON.parse(savedSession);
+    return null;
   });
+  const [rememberMe, setRememberMe] = useState(true);
   const [authUsername, setAuthUsername] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -1367,7 +1371,13 @@ export default function App() {
           .then(authRes => {
             if (authRes.success) {
               setCurrentUser(authRes.user);
-              localStorage.setItem('seoapp_user', JSON.stringify(authRes.user));
+              if (rememberMe) {
+                localStorage.setItem('seoapp_user', JSON.stringify(authRes.user));
+                sessionStorage.removeItem('seoapp_user');
+              } else {
+                sessionStorage.setItem('seoapp_user', JSON.stringify(authRes.user));
+                localStorage.removeItem('seoapp_user');
+              }
             } else {
               alert(authRes.error || 'Acest email Google nu are acces în aplicație. Contactați administratorul.');
               // Reset google session
@@ -1428,7 +1438,7 @@ export default function App() {
 
   const handleUserLogin = async (e) => {
     e?.preventDefault();
-    if (!authUsername || !authPassword) {
+     if (!authUsername || !authPassword) {
       setAuthError('Vă rugăm introduceți numele de utilizator și parola.');
       return;
     }
@@ -1443,7 +1453,13 @@ export default function App() {
       const data = await res.json();
       if (res.ok && data.success) {
         setCurrentUser(data.user);
-        localStorage.setItem('seoapp_user', JSON.stringify(data.user));
+        if (rememberMe) {
+          localStorage.setItem('seoapp_user', JSON.stringify(data.user));
+          sessionStorage.removeItem('seoapp_user');
+        } else {
+          sessionStorage.setItem('seoapp_user', JSON.stringify(data.user));
+          localStorage.removeItem('seoapp_user');
+        }
         setAuthUsername('');
         setAuthPassword('');
       } else {
@@ -1459,6 +1475,7 @@ export default function App() {
   const handleUserLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('seoapp_user');
+    sessionStorage.removeItem('seoapp_user');
     handleLogout();
   };
 
@@ -2402,6 +2419,19 @@ export default function App() {
                 onChange={(e) => setAuthPassword(e.target.value)}
                 required
               />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0', userSelect: 'none' }}>
+              <input 
+                type="checkbox" 
+                id="rememberMe" 
+                checked={rememberMe} 
+                onChange={(e) => setRememberMe(e.target.checked)} 
+                style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
+              />
+              <label htmlFor="rememberMe" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '500' }}>
+                Ține-mă minte (păstrează sesiunea activă)
+              </label>
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', marginTop: '8px', fontWeight: '700' }} disabled={isLoggingIn}>
