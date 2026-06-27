@@ -1024,6 +1024,7 @@ export default function App() {
       setActiveView('dashboard');
     } catch (err) {
       console.error('Error creating project:', err);
+      alert('Eroare la crearea proiectului. Detalii: ' + err.message);
     }
   };
 
