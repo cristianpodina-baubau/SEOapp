@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
 import { SiteCrawler } from './crawler.js';
 import { 
   getGoogleAuthUrl, 
@@ -373,6 +374,32 @@ app.post('/api/projects/:id/data', (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Auto-deployment Webhook from GitHub
+app.post('/api/deploy-webhook', (req, res) => {
+  console.log('[Webhook] Actualizare detectată pe GitHub. Se pornește descărcarea codului...');
+  
+  // Run git pull to fetch latest changes
+  exec('git pull origin main', (err, stdout, stderr) => {
+    if (err) {
+      console.error('[Webhook Error] Eșec la rularea git pull:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    console.log('[Webhook] Codul a fost actualizat cu succes:', stdout);
+    
+    // Touch tmp/restart.txt to tell cPanel Phusion Passenger to reload the Node app
+    exec('mkdir -p tmp && touch tmp/restart.txt', (err2) => {
+      if (err2) {
+        console.error('[Webhook Error] Nu s-a putut genera tmp/restart.txt:', err2.message);
+      } else {
+        console.log('[Webhook] Fisierul tmp/restart.txt a fost atins. cPanel va reporni aplicația automat.');
+      }
+    });
+
+    res.json({ message: 'Auto-deployment finalizat cu succes!', log: stdout });
+  });
 });
 
 const __filename = fileURLToPath(import.meta.url);
