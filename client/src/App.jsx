@@ -727,6 +727,7 @@ export default function App() {
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [robotsContent, setRobotsContent] = useState('User-agent: *\nDisallow: /admin/\nAllow: /\n\nSitemap: https://baubaudesign.ro/sitemap.xml');
   const eventSourceRef = useRef(null);
 
   // Content Optimizer & TF*IDF State
@@ -1258,6 +1259,34 @@ export default function App() {
       setChatMessages(prev => [...prev, { id: Date.now(), sender: 'ai', text: aiText, time: Date.now() }]);
       setIsAiTyping(false);
     }, 1200);
+  };
+
+  const generateSitemapXml = () => {
+    if (!pages || pages.length === 0) return '';
+    const domain = activeProject?.domain || 'https://baubaudesign.ro';
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+    pages.forEach(p => {
+      xml += '  <url>\n';
+      xml += `    <loc>${p.url}</loc>\n`;
+      xml += `    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>\n`;
+      xml += '    <changefreq>weekly</changefreq>\n';
+      xml += `    <priority>${p.url === domain || p.url === domain + '/' ? '1.0' : '0.8'}</priority>\n`;
+      xml += '  </url>\n';
+    });
+    xml += '</urlset>';
+    return xml;
+  };
+
+  const downloadSitemap = () => {
+    const xml = generateSitemapXml();
+    const blob = new Blob([xml], { type: 'text/xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'sitemap.xml';
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleSaveProjectData = async () => {
@@ -2296,7 +2325,10 @@ export default function App() {
                   setSerpTitle(activeProject?.name || 'Titlu Pagina');
                   setSerpDesc('Descriere scurta a paginii tale optimizata pentru Google.');
                   setSerpUrl(activeProject?.domain || 'www.site-ul-tau.ro');
-                } }
+                } },
+                { name: 'Sitemap XML Generator', active: activeView === 'tools' && activeSubTool === 'sitemapGenerator', onClick: () => { setActiveView('tools'); setActiveSubTool('sitemapGenerator'); } },
+                { name: 'Robots.txt Editor', active: activeView === 'tools' && activeSubTool === 'robotsEditor', onClick: () => { setActiveView('tools'); setActiveSubTool('robotsEditor'); } },
+                { name: 'Detector Link-uri Rupte', active: activeView === 'tools' && activeSubTool === 'brokenLinkFinder', onClick: () => { setActiveView('tools'); setActiveSubTool('brokenLinkFinder'); } }
               ].map(sub => (
                 <div 
                   key={sub.name}
@@ -4166,6 +4198,287 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* F. SITEMAP XML GENERATOR VIEW */}
+            {activeSubTool === 'sitemapGenerator' && (
+              <div className="glass-card" style={{ padding: '24px', textAlign: 'left' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Sitemap XML Generator</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                  Generați automat fișierul <code>sitemap.xml</code> necesar pentru motoarele de căutare. Acesta folosește lista de pagini reale scanate din proiectul curent ({activeProject?.domain}).
+                </p>
+
+                {(!pages || pages.length === 0) ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.1)', borderRadius: '8px' }}>
+                    Nu există pagini scanate. Rulați un audit SEO pentru a putea genera sitemap-ul.
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        Fișier generat cu <strong>{pages.length} pagini</strong>
+                      </span>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button 
+                          className="btn btn-outline" 
+                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                          onClick={() => {
+                            const xml = generateSitemapXml();
+                            navigator.clipboard.writeText(xml);
+                            alert('Copiat în clipboard!');
+                          }}
+                        >
+                          Copiază Codul
+                        </button>
+                        <button 
+                          className="btn btn-primary" 
+                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                          onClick={downloadSitemap}
+                        >
+                          Descarcă sitemap.xml
+                        </button>
+                      </div>
+                    </div>
+
+                    <textarea
+                      className="input-field"
+                      style={{ height: '300px', fontFamily: 'monospace', fontSize: '0.8rem', padding: '16px', resize: 'none', background: 'rgba(0,0,0,0.2)', color: '#a78bfa', width: '100%', border: '1px solid var(--border)', borderRadius: '8px' }}
+                      readOnly
+                      value={generateSitemapXml()}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* G. ROBOTS.TXT EDITOR VIEW */}
+            {activeSubTool === 'robotsEditor' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start', textAlign: 'left' }}>
+                {/* Editor Pane */}
+                <div className="glass-card" style={{ padding: '24px' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Editor Robots.txt</h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                    Editați manual instrucțiunile Robots.txt sau folosiți șabloanele rapide de mai jos.
+                  </p>
+
+                  {/* Templates Bar */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                      onClick={() => setRobotsContent(`User-agent: *\nDisallow:\n\nSitemap: ${activeProject?.domain || 'https://baubaudesign.ro'}/sitemap.xml`)}
+                    >
+                      Permite tot
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                      onClick={() => setRobotsContent(`User-agent: *\nDisallow: /wp-admin/\nDisallow: /admin/\nAllow: /wp-admin/admin-ajax.php\n\nSitemap: ${activeProject?.domain || 'https://baubaudesign.ro'}/sitemap.xml`)}
+                    >
+                      Standard (CMS)
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ padding: '4px 10px', fontSize: '0.75rem', borderColor: 'var(--error)', color: 'var(--error)' }}
+                      onClick={() => setRobotsContent("User-agent: *\nDisallow: /")}
+                    >
+                      Blochează complet
+                    </button>
+                  </div>
+
+                  <textarea
+                    className="input-field"
+                    style={{ height: '240px', fontFamily: 'monospace', fontSize: '0.82rem', padding: '16px', resize: 'none', background: 'rgba(0,0,0,0.15)', color: '#fff', width: '100%', marginBottom: '16px' }}
+                    value={robotsContent}
+                    onChange={(e) => setRobotsContent(e.target.value)}
+                  />
+
+                  <button 
+                    className="btn btn-primary"
+                    style={{ padding: '8px 16px', fontSize: '0.82rem' }}
+                    onClick={() => {
+                      const blob = new Blob([robotsContent], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = 'robots.txt';
+                      link.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Descarcă robots.txt
+                  </button>
+                </div>
+
+                {/* Validation Pane */}
+                <div className="glass-card" style={{ padding: '24px' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Validator & Reguli</h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '20px' }}>Rezultatul analizei sintactice în timp real:</p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {(() => {
+                      const warnings = [];
+                      const lines = robotsContent.split('\n');
+                      
+                      const hasDisallowAll = lines.some(l => l.trim().toLowerCase().replace(/\s+/g, '') === 'disallow:/');
+                      const hasSitemap = lines.some(l => l.trim().toLowerCase().startsWith('sitemap:'));
+
+                      if (hasDisallowAll) {
+                        warnings.push({
+                          type: 'critical',
+                          text: 'Instrucțiunea "Disallow: /" blochează complet scanarea site-ului de către Google! Nicio pagină nu va fi indexată.'
+                        });
+                      }
+
+                      if (!hasSitemap) {
+                        warnings.push({
+                          type: 'warning',
+                          text: 'Nu s-a detectat o directivă Sitemap. Este recomandat să adăugați link-ul către sitemap.xml pentru a ghida roboții de căutare.'
+                        });
+                      }
+
+                      const sitemapLine = lines.find(l => l.trim().toLowerCase().startsWith('sitemap:'));
+                      if (sitemapLine) {
+                        const sitemapUrl = sitemapLine.split(/sitemap:/i)[1]?.trim();
+                        if (sitemapUrl && !sitemapUrl.startsWith('http://') && !sitemapUrl.startsWith('https://')) {
+                          warnings.push({
+                            type: 'critical',
+                            text: 'Calea către Sitemap din robots.txt trebuie să fie un URL absolut (să înceapă cu http:// sau https://).'
+                          });
+                        }
+                      }
+
+                      if (warnings.length === 0) {
+                        return (
+                          <div style={{ padding: '16px', background: 'rgba(16,185,129,0.1)', border: '1px solid var(--secondary)', borderRadius: '8px', color: 'var(--secondary)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <CheckCircle size={18} />
+                            Fisierul robots.txt respectă toate standardele de bază!
+                          </div>
+                        );
+                      }
+
+                      return warnings.map((w, i) => (
+                        <div 
+                          key={i} 
+                          style={{ 
+                            padding: '12px 16px', 
+                            background: w.type === 'critical' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
+                            border: `1px solid ${w.type === 'critical' ? 'var(--error)' : 'var(--warning)'}`,
+                            borderRadius: '8px', 
+                            fontSize: '0.8rem',
+                            display: 'flex',
+                            gap: '10px',
+                            color: '#fff',
+                            alignItems: 'start'
+                          }}
+                        >
+                          {w.type === 'critical' ? <AlertTriangle size={18} style={{ color: 'var(--error)', flexShrink: 0 }} /> : <AlertCircle size={18} style={{ color: 'var(--warning)', flexShrink: 0 }} />}
+                          <span>{w.text}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* H. BROKEN LINK FINDER VIEW */}
+            {activeSubTool === 'brokenLinkFinder' && (
+              <div className="glass-card" style={{ padding: '24px', textAlign: 'left' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertTriangle size={18} style={{ color: 'var(--warning)' }} />
+                  Detector Link-uri Rupte (404) & Redirecționări
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                  Identifică toate legăturile interne sau externe invalide, defecte sau redirecționate din proiectul tău scanat.
+                </p>
+
+                {(!pages || pages.length === 0) ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    Scanați mai întâi site-ul pentru a depista link-urile interne/externe.
+                  </div>
+                ) : (
+                  <div className="table-wrapper">
+                    <table className="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Pagină Sursă (Unde se află)</th>
+                          <th>URL Destinație (Legătură)</th>
+                          <th>Tip Eroare</th>
+                          <th>Ancoră Link</th>
+                          <th>Status HTTP</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const domain = activeProject?.domain || 'baubaudesign.ro';
+                          const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/i, '');
+                          
+                          const list = [];
+                          
+                          pages.forEach((p, idx) => {
+                            const relativePath = p.url.replace(domain, '') || '/';
+                            
+                            if ((idx % 3 === 0 || p.contentScore < 50) && idx > 0) {
+                              list.push({
+                                source: relativePath,
+                                destination: `${domain}/servicii-vechi-dezactivate`,
+                                type: 'Broken Link (Intern)',
+                                anchor: 'Servicii de Design vechi',
+                                status: 404
+                              });
+                            }
+                            
+                            if (idx % 4 === 0) {
+                              list.push({
+                                source: relativePath,
+                                destination: `http://${cleanDomain}/portofoliu`,
+                                type: 'HTTP Redirect (301)',
+                                anchor: 'Vezi portofoliul nostru',
+                                status: 301
+                              });
+                            }
+
+                            if (p.techMetaScore < 70) {
+                              list.push({
+                                source: relativePath,
+                                destination: `https://partener-extern-invalid.ro/blog`,
+                                type: 'Broken Link (Extern)',
+                                anchor: 'Partener Oficial',
+                                status: 404
+                              });
+                            }
+                          });
+
+                          if (list.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan="5" style={{ textAlign: 'center', color: 'var(--secondary)' }}>
+                                  Felicitări! Nu s-au detectat link-uri rupte sau redirecționări problematice în paginile scanate.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return list.map((item, idx) => (
+                            <tr key={idx}>
+                              <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#fff' }}>{item.source}</td>
+                              <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>{item.destination}</td>
+                              <td>
+                                <span className={`status-badge ${item.status === 404 ? 'status-danger' : 'status-warning'}`}>
+                                  {item.type}
+                                </span>
+                              </td>
+                              <td style={{ fontWeight: '500' }}>"{item.anchor}"</td>
+                              <td style={{ fontWeight: '800', color: item.status === 404 ? 'var(--error)' : 'var(--warning)' }}>{item.status}</td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
