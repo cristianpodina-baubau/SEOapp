@@ -316,7 +316,7 @@ app.get('/api/users', (req, res) => {
 
 // Create new user
 app.post('/api/users', (req, res) => {
-  const { name, username, password, role, email } = req.body;
+  const { name, username, password, role, email, allowedProjects } = req.body;
 
   if (!name || !username || !password) {
     return res.status(400).json({ error: 'Numele, numele de utilizator și parola sunt obligatorii.' });
@@ -335,7 +335,8 @@ app.post('/api/users', (req, res) => {
       username: username.trim().toLowerCase(),
       password: password,
       role: role || 'editor',
-      email: email ? email.trim().toLowerCase() : ''
+      email: email ? email.trim().toLowerCase() : '',
+      allowedProjects: Array.isArray(allowedProjects) ? allowedProjects : []
     };
 
     users.push(newUser);
@@ -431,8 +432,17 @@ app.post('/api/google/ads', async (req, res) => {
 // ==========================================
 
 app.get('/api/projects', (req, res) => {
+  const { userId } = req.query;
   try {
-    const list = getProjects();
+    let list = getProjects();
+    if (userId) {
+      const users = getUsers();
+      const user = users.find(u => u.id === userId);
+      if (user && user.role !== 'admin') {
+        const allowed = user.allowedProjects || [];
+        list = list.filter(p => allowed.includes(p.id));
+      }
+    }
     res.json(list);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -501,6 +511,18 @@ app.delete('/api/projects/:id', (req, res) => {
 
 app.get('/api/projects/:id/data', (req, res) => {
   const { id } = req.params;
+  const { userId } = req.query;
+
+  if (userId) {
+    const users = getUsers();
+    const user = users.find(u => u.id === userId);
+    if (user && user.role !== 'admin') {
+      const allowed = user.allowedProjects || [];
+      if (!allowed.includes(id)) {
+        return res.status(403).json({ error: 'Nu aveți acces la acest proiect.' });
+      }
+    }
+  }
 
   try {
     const data = getProjectData(id);
@@ -512,7 +534,19 @@ app.get('/api/projects/:id/data', (req, res) => {
 
 app.post('/api/projects/:id/data', (req, res) => {
   const { id } = req.params;
+  const { userId } = req.query;
   const { pages, editorText, targetKeywords, googlePropertyId } = req.body;
+
+  if (userId) {
+    const users = getUsers();
+    const user = users.find(u => u.id === userId);
+    if (user && user.role !== 'admin') {
+      const allowed = user.allowedProjects || [];
+      if (!allowed.includes(id)) {
+        return res.status(403).json({ error: 'Nu aveți acces la acest proiect.' });
+      }
+    }
+  }
 
   try {
     const data = getProjectData(id);

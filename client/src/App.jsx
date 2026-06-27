@@ -715,6 +715,7 @@ export default function App() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('editor');
   const [isAddingUser, setIsAddingUser] = useState(false);
+  const [newUserAllowedProjects, setNewUserAllowedProjects] = useState([]);
 
   // Crawler State
   const [targetUrl, setTargetUrl] = useState('https://example.com');
@@ -954,14 +955,16 @@ export default function App() {
     }, 1200);
   };
 
-  // Load projects on startup
+  // Load projects on startup and when user session changes
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (currentUser) {
+      fetchProjects();
+    }
+  }, [currentUser]);
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch('/api/projects');
+      const res = await fetch(`/api/projects?userId=${currentUser?.id || ''}`);
       const list = await res.json();
       setProjects(list);
       
@@ -983,7 +986,7 @@ export default function App() {
 
     // Fetch project stored data
     try {
-      const res = await fetch(`/api/projects/${project.id}/data`);
+      const res = await fetch(`/api/projects/${project.id}/data?userId=${currentUser?.id || ''}`);
       const data = await res.json();
       setPages(data.pages || []);
       setEditorText(data.editorText || '');
@@ -1006,7 +1009,7 @@ export default function App() {
       });
       const newProj = await res.json();
       
-      const updatedRes = await fetch('/api/projects');
+      const updatedRes = await fetch(`/api/projects?userId=${currentUser?.id || ''}`);
       const list = await updatedRes.json();
       setProjects(list);
       
@@ -1029,7 +1032,7 @@ export default function App() {
 
     try {
       await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
-      const res = await fetch('/api/projects');
+      const res = await fetch(`/api/projects?userId=${currentUser?.id || ''}`);
       const list = await res.json();
       setProjects(list);
       
@@ -1315,7 +1318,7 @@ export default function App() {
     setIsSavingProjectData(true);
 
     try {
-      await fetch(`/api/projects/${activeProject.id}/data`, {
+      await fetch(`/api/projects/${activeProject.id}/data?userId=${currentUser?.id || ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1507,7 +1510,8 @@ export default function App() {
           username: newUserUsername,
           password: newUserPassword,
           email: newUserEmail,
-          role: newUserRole
+          role: newUserRole,
+          allowedProjects: newUserRole === 'editor' ? newUserAllowedProjects : []
         })
       });
       const data = await res.json();
@@ -1518,6 +1522,7 @@ export default function App() {
         setNewUserPassword('');
         setNewUserEmail('');
         setNewUserRole('editor');
+        setNewUserAllowedProjects([]);
         fetchUsers();
       } else {
         alert(data.error || 'Eroare la crearea utilizatorului.');
@@ -6872,6 +6877,7 @@ export default function App() {
                         <th>Nume Utilizator</th>
                         <th>Email</th>
                         <th>Rol</th>
+                        <th>Proiecte Permise</th>
                         <th style={{ textAlign: 'center' }}>Acțiuni</th>
                       </tr>
                     </thead>
@@ -6885,6 +6891,21 @@ export default function App() {
                             <span className={`status-badge ${user.role === 'admin' ? 'status-success' : 'status-warning'}`} style={{ textTransform: 'capitalize' }}>
                               {user.role === 'admin' ? 'Administrator' : 'Editor'}
                             </span>
+                          </td>
+                          <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {user.role === 'admin' ? (
+                              <span style={{ color: 'var(--success)', fontWeight: '600' }}>Toate (Admin)</span>
+                            ) : (
+                              (() => {
+                                const allowedIds = user.allowedProjects || [];
+                                if (allowedIds.length === 0) return <span style={{ color: 'var(--error)', fontSize: '0.75rem' }}>Niciunul</span>;
+                                const names = allowedIds.map(id => {
+                                  const p = projects.find(proj => proj.id === id);
+                                  return p ? p.name : null;
+                                }).filter(Boolean);
+                                return names.length > 0 ? names.join(', ') : <span style={{ color: 'var(--error)', fontSize: '0.75rem' }}>Niciunul</span>;
+                              })()
+                            )}
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             {user.id !== 'usr_admin' ? (
@@ -6982,6 +7003,47 @@ export default function App() {
                       <option value="admin">Administrator (Control Complet)</option>
                     </select>
                   </div>
+
+                  {newUserRole === 'editor' && (
+                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '10px', fontWeight: '600' }}>
+                        PROIECTE PERMISE (ACCES EDITOR)
+                      </label>
+                      {projects.length === 0 ? (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Nu există proiecte active create.</span>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
+                          {projects.map((proj) => {
+                            const isChecked = newUserAllowedProjects.includes(proj.id);
+                            return (
+                              <label key={proj.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', cursor: 'pointer', color: '#fff' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setNewUserAllowedProjects([...newUserAllowedProjects, proj.id]);
+                                    } else {
+                                      setNewUserAllowedProjects(newUserAllowedProjects.filter(id => id !== proj.id));
+                                    }
+                                  }}
+                                  style={{ accentColor: 'var(--primary)' }}
+                                />
+                                <span style={{ fontWeight: '500' }}>{proj.name}</span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>({proj.domain.replace(/https?:\/\/(www\.)?/, '')})</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {newUserRole === 'admin' && (
+                    <div style={{ background: 'rgba(52,211,153,0.05)', padding: '12px 16px', borderRadius: '8px', border: '1px dashed rgba(52,211,153,0.2)', fontSize: '0.78rem', color: 'var(--success)' }}>
+                      Administratorul are acces implicit la toate proiectele existente și viitoare.
+                    </div>
+                  )}
 
                   <button 
                     type="submit" 
