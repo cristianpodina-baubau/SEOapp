@@ -2490,6 +2490,8 @@ export default function App() {
             onChange={(e) => {
               if (e.target.value === 'NEW') {
                 setIsNewProjectModalOpen(true);
+                // Reset select value so it doesn't stay locked on "NEW"
+                e.target.value = activeProject?.id || '';
               } else {
                 const selected = projects.find(p => p.id === e.target.value);
                 handleSelectProject(selected);
@@ -2497,6 +2499,7 @@ export default function App() {
               setIsMobileMenuOpen(false);
             }}
           >
+            <option value="" disabled>Alege un proiect...</option>
             {projects.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
