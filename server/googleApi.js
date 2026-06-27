@@ -14,11 +14,18 @@ const oauth2Client = new OAuth2Client(
 /**
  * Generates the Google OAuth authorization URL.
  */
-export function getGoogleAuthUrl() {
+export function getGoogleAuthUrl(dynamicRedirectUri) {
+  const redirectUri = dynamicRedirectUri || process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5173/auth/google/callback';
+
   if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'MOCK_CLIENT_ID') {
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5173/auth/google/callback';
     return `${redirectUri}?code=mock_authorization_code_success`;
   }
+
+  const client = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri
+  );
 
   const scopes = [
     'https://www.googleapis.com/auth/webmasters.readonly', // Search Console
@@ -28,7 +35,7 @@ export function getGoogleAuthUrl() {
     'https://www.googleapis.com/auth/userinfo.email'
   ];
 
-  return oauth2Client.generateAuthUrl({
+  return client.generateAuthUrl({
     access_type: 'offline',
     scope: scopes,
     prompt: 'consent'
@@ -38,7 +45,7 @@ export function getGoogleAuthUrl() {
 /**
  * Exchanges the code for Google Access and Refresh Tokens.
  */
-export async function getTokensFromCode(code) {
+export async function getTokensFromCode(code, dynamicRedirectUri) {
   if (process.env.GOOGLE_CLIENT_ID === undefined || process.env.GOOGLE_CLIENT_ID === 'MOCK_CLIENT_ID') {
     // Return mock tokens in development/no-env mode
     return {
@@ -49,7 +56,14 @@ export async function getTokensFromCode(code) {
     };
   }
 
-  const { tokens } = await oauth2Client.getToken(code);
+  const redirectUri = dynamicRedirectUri || process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5173/auth/google/callback';
+  const client = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri
+  );
+
+  const { tokens } = await client.getToken(code);
   return tokens;
 }
 

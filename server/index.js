@@ -196,7 +196,18 @@ app.get('/api/crawl/stream', (req, res) => {
 
 app.get('/api/auth/google/url', (req, res) => {
   try {
-    const url = getGoogleAuthUrl();
+    const referer = req.get('referer');
+    let origin = 'https://seoapp.baubaudesign.ro';
+    if (referer) {
+      try {
+        const urlObj = new URL(referer);
+        origin = urlObj.origin;
+      } catch (e) {
+        // Fallback
+      }
+    }
+    const redirectUri = `${origin}/auth/google/callback`;
+    const url = getGoogleAuthUrl(redirectUri);
     res.json({ url });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -210,7 +221,19 @@ app.post('/api/auth/google/callback', async (req, res) => {
   }
 
   try {
-    const tokens = await getTokensFromCode(code);
+    const referer = req.get('referer');
+    let origin = 'https://seoapp.baubaudesign.ro';
+    if (referer) {
+      try {
+        const urlObj = new URL(referer);
+        origin = urlObj.origin;
+      } catch (e) {
+        // Fallback
+      }
+    }
+    const redirectUri = `${origin}/auth/google/callback`;
+
+    const tokens = await getTokensFromCode(code, redirectUri);
     const user = await getUserInfo(tokens);
     res.json({ tokens, user });
   } catch (error) {
