@@ -684,6 +684,19 @@ export default function App() {
   const [isSavingProjectData, setIsSavingProjectData] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Reports Sorting State
+  const [reportsSortField, setReportsSortField] = useState(null);
+  const [reportsSortDirection, setReportsSortDirection] = useState('asc');
+
+  const handleRequestSort = (field) => {
+    let direction = 'asc';
+    if (reportsSortField === field && reportsSortDirection === 'asc') {
+      direction = 'desc';
+    }
+    setReportsSortField(field);
+    setReportsSortDirection(direction);
+  };
+
   // Authentication State
   const [googleTokens, setGoogleTokens] = useState(() => {
     const saved = localStorage.getItem('google_tokens');
@@ -5089,7 +5102,36 @@ export default function App() {
 
                     {(() => {
                       const isBreakdown = activeReportTab === 'internal' || activeReportTab === 'external';
-                      const listToUse = isBreakdown ? filteredBreakdownUrlsList : filteredUrlsList;
+                      let listToUse = isBreakdown ? filteredBreakdownUrlsList : filteredUrlsList;
+                      
+                      // Apply interactive sorting
+                      if (reportsSortField) {
+                        listToUse = [...listToUse].sort((a, b) => {
+                          let valA = a[reportsSortField];
+                          let valB = b[reportsSortField];
+                          
+                          // Normalize values for sorting
+                          if (reportsSortField === 'sizeBytes') {
+                            valA = a.sizeBytes || 0;
+                            valB = b.sizeBytes || 0;
+                          } else if (reportsSortField === 'wordCount') {
+                            valA = a.wordCount || 0;
+                            valB = b.wordCount || 0;
+                          } else if (reportsSortField === 'status') {
+                            valA = a.status || 0;
+                            valB = b.status || 0;
+                          } else {
+                            // String comparison
+                            valA = (valA || '').toString().toLowerCase();
+                            valB = (valB || '').toString().toLowerCase();
+                          }
+                          
+                          if (valA < valB) return reportsSortDirection === 'asc' ? -1 : 1;
+                          if (valA > valB) return reportsSortDirection === 'asc' ? 1 : -1;
+                          return 0;
+                        });
+                      }
+
                       const totalItems = listToUse.length;
                       
                       const totalPages = reportsPerPage === 'all' ? 1 : Math.ceil(totalItems / reportsPerPage);
@@ -5104,11 +5146,21 @@ export default function App() {
                               <thead>
                                 {isBreakdown ? (
                                   <tr>
-                                    <th>URL</th>
-                                    <th>Tip Resursă</th>
-                                    <th>Status Code</th>
-                                    <th>Word Count</th>
-                                    <th>Dimensiune (kB)</th>
+                                    <th onClick={() => handleRequestSort('url')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                      URL {reportsSortField === 'url' ? (reportsSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
+                                    </th>
+                                    <th onClick={() => handleRequestSort('type')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                      Tip Resursă {reportsSortField === 'type' ? (reportsSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
+                                    </th>
+                                    <th onClick={() => handleRequestSort('status')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                      Status Code {reportsSortField === 'status' ? (reportsSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
+                                    </th>
+                                    <th onClick={() => handleRequestSort('wordCount')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                      Word Count {reportsSortField === 'wordCount' ? (reportsSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
+                                    </th>
+                                    <th onClick={() => handleRequestSort('sizeBytes')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                      Dimensiune (kB) {reportsSortField === 'sizeBytes' ? (reportsSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
+                                    </th>
                                   </tr>
                                 ) : (
                                   <tr>
@@ -5253,36 +5305,71 @@ export default function App() {
                               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                                 Afișare {startIndex + 1}-{endIndex} din {totalItems} pagini
                               </div>
-                              <div style={{ display: 'flex', gap: '6px' }}>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                 <button
                                   className="btn btn-outline"
                                   style={{ padding: '6px 12px', fontSize: '0.8rem' }}
                                   disabled={reportsCurrentPage === 1}
                                   onClick={() => setReportsCurrentPage(prev => Math.max(prev - 1, 1))}
                                 >
-                                  Precedent
+                                  ←
                                 </button>
                                 
-                                {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-                                  const isActive = pageNum === reportsCurrentPage;
-                                  return (
-                                    <button
-                                      key={pageNum}
-                                      className={`btn ${isActive ? 'btn-primary' : 'btn-outline'}`}
-                                      style={{ 
-                                        padding: '6px 10px', 
-                                        fontSize: '0.8rem', 
-                                        minWidth: '32px',
-                                        backgroundColor: isActive ? 'var(--primary)' : 'transparent',
-                                        borderColor: isActive ? 'var(--primary)' : 'var(--border)',
-                                        color: '#fff'
-                                      }}
-                                      onClick={() => setReportsCurrentPage(pageNum)}
-                                    >
-                                      {pageNum}
-                                    </button>
-                                  );
-                                })}
+                                {(() => {
+                                  const pages = [];
+                                  const currentPage = reportsCurrentPage;
+                                  
+                                  if (totalPages <= 5) {
+                                    for (let i = 1; i <= totalPages; i++) {
+                                      pages.push(i);
+                                    }
+                                  } else {
+                                    if (currentPage <= 3) {
+                                      pages.push(1, 2, 3, 4, '...', totalPages);
+                                    } else if (currentPage >= totalPages - 2) {
+                                      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                                    } else {
+                                      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                                    }
+                                  }
+                                  
+                                  return pages.map((pageNum, index) => {
+                                    if (pageNum === '...') {
+                                      return (
+                                        <span 
+                                          key={`dots-${index}`} 
+                                          style={{ 
+                                            padding: '6px 8px', 
+                                            color: 'var(--text-muted)', 
+                                            alignSelf: 'center',
+                                            fontSize: '0.85rem' 
+                                          }}
+                                        >
+                                          ...
+                                        </span>
+                                      );
+                                    }
+                                    
+                                    const isActive = pageNum === currentPage;
+                                    return (
+                                      <button
+                                        key={pageNum}
+                                        className={`btn ${isActive ? 'btn-primary' : 'btn-outline'}`}
+                                        style={{ 
+                                          padding: '6px 10px', 
+                                          fontSize: '0.8rem', 
+                                          minWidth: '32px',
+                                          backgroundColor: isActive ? 'var(--primary)' : 'transparent',
+                                          borderColor: isActive ? 'var(--primary)' : 'var(--border)',
+                                          color: '#fff'
+                                        }}
+                                        onClick={() => setReportsCurrentPage(pageNum)}
+                                      >
+                                        {pageNum}
+                                      </button>
+                                    );
+                                  });
+                                })()}
 
                                 <button
                                   className="btn btn-outline"
@@ -5290,7 +5377,7 @@ export default function App() {
                                   disabled={reportsCurrentPage === totalPages}
                                   onClick={() => setReportsCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                 >
-                                  Următor
+                                  →
                                 </button>
                               </div>
                             </div>

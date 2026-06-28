@@ -142,6 +142,9 @@ app.get('/api/pagespeed', async (req, res) => {
 // CRAWLER ENDPOINTS (Server-Sent Events)
 // ==========================================
 
+// Global map to track active background crawls
+const activeCrawls = new Map();
+
 app.get('/api/crawl/stream', (req, res) => {
   const { domain, maxPages, projectId } = req.query;
 
@@ -158,43 +161,82 @@ app.get('/api/crawl/stream', (req, res) => {
   });
 
   const parsedMaxPages = parseInt(maxPages) || 30;
-  
-  console.log(`[Crawler] Cerere primită pentru domeniul: ${domain}, max pagini: ${parsedMaxPages}, proiect: ${projectId || 'niciunul'}`);
+  const projectKey = projectId || domain;
 
-  // Stream connection start
+  // 1. Check if a crawl is already running for this project/domain
+  if (activeCrawls.has(projectKey)) {
+    console.log(`[Crawler] Client conectat la scanarea existentă în fundal pentru: ${domain}`);
+    const activeCrawl = activeCrawls.get(projectKey);
+    
+    // Add this response connection to the listeners list
+    activeCrawl.listeners.push(res);
+
+    // Send initial start event and catch-up progress
+    res.write(`data: ${JSON.stringify({ type: 'start', message: `Te-ai conectat la scanarea în curs pentru: ${domain}` })}\n\n`);
+    
+    // Send already crawled pages to the client so they load them in the UI
+    for (const page of activeCrawl.pages) {
+      res.write(`data: ${JSON.stringify({ type: 'page', page })}\n\n`);
+    }
+
+    if (activeCrawl.stats) {
+      res.write(`data: ${JSON.stringify({ type: 'progress', stats: activeCrawl.stats })}\n\n`);
+    }
+
+    // Clean up listener connection on close, but DO NOT stop the crawl
+    req.on('close', () => {
+      console.log(`[Crawler] Client deconectat de la scanarea activă. Scanarea continuă în fundal.`);
+      activeCrawl.listeners = activeCrawl.listeners.filter(l => l !== res);
+    });
+    return;
+  }
+
+  // 2. Start a new crawl if none is running
+  console.log(`[Crawler] Pornire scanare nouă în fundal pentru domeniul: ${domain}, max pagini: ${parsedMaxPages}`);
   res.write(`data: ${JSON.stringify({ type: 'start', message: `Inițializare crawler pentru: ${domain}` })}\n\n`);
 
   const crawler = new SiteCrawler(domain, parsedMaxPages);
+  
+  const activeCrawl = {
+    crawler,
+    pages: [],
+    stats: { current: 0, total: 0, checked: 0 },
+    listeners: [res]
+  };
+  activeCrawls.set(projectKey, activeCrawl);
 
   crawler.onProgress = (stats) => {
-    res.write(`data: ${JSON.stringify({ type: 'progress', stats })}\n\n`);
+    activeCrawl.stats = stats;
+    activeCrawl.listeners.forEach(listener => {
+      listener.write(`data: ${JSON.stringify({ type: 'progress', stats })}\n\n`);
+    });
   };
 
   crawler.onPageCrawled = (page) => {
     console.log(`[Crawler] Scanat cu succes: ${page.url} (Scor: ${page.score}, Status: ${page.statusCode || 200})`);
-    res.write(`data: ${JSON.stringify({ type: 'page', page })}\n\n`);
+    activeCrawl.pages.push(page);
+    activeCrawl.listeners.forEach(listener => {
+      listener.write(`data: ${JSON.stringify({ type: 'page', page })}\n\n`);
+    });
   };
 
   crawler.onFinished = async (pages) => {
-    console.log(`[Crawler] Scanare completată. Total pagini scanate: ${pages.length}`);
+    console.log(`[Crawler] Scanare în fundal completată. Total pagini scanate: ${pages.length} pentru proiectul ${projectKey}`);
     
-    // Auto-save results to project file if projectId is present
+    // Save results to project file if projectId is present
     if (projectId) {
       try {
         const projectData = await getProjectData(projectId);
         
-        // Initialize history if missing
         if (!projectData.history) {
           projectData.history = [];
         }
         
-        // Save current pages to history
         projectData.history.push({
           timestamp: new Date().toISOString(),
           pages: pages
         });
         
-        // Limit to last 5 crawls
         if (projectData.history.length > 5) {
           projectData.history = projectData.history.slice(-5);
         }
@@ -202,27 +244,35 @@ app.get('/api/crawl/stream', (req, res) => {
         projectData.pages = pages;
         projectData.lastCrawlTime = new Date().toISOString();
         await saveProjectData(projectId, projectData);
-        console.log(`[Crawler] Rezultate salvate cu succes pentru proiectul: ${projectId}`);
+        console.log(`[Crawler] Rezultate salvate cu succes în DB pentru: ${projectId}`);
       } catch (err) {
-        console.error(`[Crawler] Eroare la salvarea paginilor pentru proiectul ${projectId}:`, err.message);
+        console.error(`[Crawler Error] Eșec la salvarea rezultatelor în fundal pentru ${projectId}:`, err.message);
       }
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'finished', pages })}\n\n`);
-    res.end();
+    // Notify all active listeners and close connections
+    activeCrawl.listeners.forEach(listener => {
+      listener.write(`data: ${JSON.stringify({ type: 'finished', pages })}\n\n`);
+      listener.end();
+    });
+
+    // Remove from active list
+    activeCrawls.delete(projectKey);
   };
 
-  // Start crawling
   crawler.start().catch((err) => {
-    console.error(`[Crawler] Eroare la pornirea crawling-ului:`, err.message);
-    res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
-    res.end();
+    console.error(`[Crawler] Eroare la scanare în fundal:`, err.message);
+    activeCrawl.listeners.forEach(listener => {
+      listener.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      listener.end();
+    });
+    activeCrawls.delete(projectKey);
   });
 
-  // If user closes connection, stop crawling
+  // If initial connection closes, just remove the listener. DO NOT stop the crawl!
   req.on('close', () => {
-    console.log(`[Crawler] Conexiune închisă de client. Oprire crawl.`);
-    crawler.stop();
+    console.log(`[Crawler] Conexiune închisă de clientul inițial. Scanarea continuă în fundal pe server.`);
+    activeCrawl.listeners = activeCrawl.listeners.filter(l => l !== res);
   });
 });
 
