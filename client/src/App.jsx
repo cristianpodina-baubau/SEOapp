@@ -2520,54 +2520,58 @@ export default function App() {
             <span>Tablou General</span>
           </div>
 
-          <div 
-            className={`menu-item ${activeView === 'editor' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveView('editor');
-              setIsMobileMenuOpen(false);
-            }}
-          >
-            <BookOpen />
-            <span>Asistent Conținut</span>
-          </div>
+          {currentUser?.role === 'admin' && (
+            <>
+              <div 
+                className={`menu-item ${activeView === 'editor' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveView('editor');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <BookOpen />
+                <span>Asistent Conținut</span>
+              </div>
 
-          <div 
-            className={`menu-item ${activeView === 'backlinks' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveView('backlinks');
-              setBacklinksCurrentPage(1);
-              setIsMobileMenuOpen(false);
-            }}
-          >
-            <Link2 />
-            <span>Audit Backlinks</span>
-          </div>
+              <div 
+                className={`menu-item ${activeView === 'backlinks' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveView('backlinks');
+                  setBacklinksCurrentPage(1);
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <Link2 />
+                <span>Audit Backlinks</span>
+              </div>
 
-          <div 
-            className={`menu-item ${activeView === 'rankings' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveView('rankings');
-              setRankingsCurrentPage(1);
-              setIsMobileMenuOpen(false);
-            }}
-          >
-            <TrendingUp />
-            <span>Rank Tracking (GSC)</span>
-          </div>
+              <div 
+                className={`menu-item ${activeView === 'rankings' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveView('rankings');
+                  setRankingsCurrentPage(1);
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <TrendingUp />
+                <span>Rank Tracking (GSC)</span>
+              </div>
 
-          <div 
-            className={`menu-item ${activeView === 'reports' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveView('reports');
-              setActiveReportTab('internal');
-              setSelectedReportFilter('all');
-              setReportsCurrentPage(1);
-              setIsMobileMenuOpen(false);
-            }}
-          >
-            <BarChart2 />
-            <span>Rapoarte SEO</span>
-          </div>
+              <div 
+                className={`menu-item ${activeView === 'reports' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveView('reports');
+                  setActiveReportTab('internal');
+                  setSelectedReportFilter('all');
+                  setReportsCurrentPage(1);
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <BarChart2 />
+                <span>Rapoarte SEO</span>
+              </div>
+            </>
+          )}
 
           <div 
             className={`menu-item ${activeView === 'todo' ? 'active' : ''}`}
@@ -2582,67 +2586,71 @@ export default function App() {
             <span>Planificator To-Do</span>
           </div>
 
-          <div 
-            className={`menu-item ${activeView === 'tools' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveView('tools');
-              setActiveSubTool(null);
-              setToolsExpanded(!toolsExpanded);
-            }}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Wrench />
-              <span>Unelte SEO</span>
-            </div>
-            {toolsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </div>
-          {toolsExpanded && (
-            <div className="tools-submenu">
-              {[
-                { name: 'SEO Checker', active: activeView === 'dashboard', onClick: () => { setActiveView('dashboard'); setDiagCurrentPage(1); } },
-                { name: 'Keyword Checker', active: activeView === 'rankings', onClick: () => { setActiveView('rankings'); setRankingsCurrentPage(1); } },
-                { name: 'Keyword Research Tool', active: activeView === 'tools' && activeSubTool === 'keywordResearch', onClick: () => { setActiveView('tools'); setActiveSubTool('keywordResearch'); } },
-                { name: 'SEO Compare', active: activeView === 'tools' && activeSubTool === 'seoCompare', onClick: () => { setActiveView('tools'); setActiveSubTool('seoCompare'); } },
-                { name: 'Ranking Checker', active: activeView === 'tools' && activeSubTool === 'rankingChecker', onClick: () => { setActiveView('tools'); setActiveSubTool('rankingChecker'); } },
-                { name: 'TF*IDF Tool', active: activeView === 'editor', onClick: () => { setActiveView('editor'); } },
-                { name: 'Backlink Checker', active: activeView === 'backlinks', onClick: () => { setActiveView('backlinks'); setBacklinksCurrentPage(1); } },
-                { name: 'Redirect Checker', active: activeView === 'tools' && activeSubTool === 'redirectChecker', onClick: () => { setActiveView('tools'); setActiveSubTool('redirectChecker'); } },
-                { name: 'SERP Snippet Generator', active: activeView === 'tools' && activeSubTool === 'serpGenerator', onClick: () => {
+          {currentUser?.role === 'admin' && (
+            <>
+              <div 
+                className={`menu-item ${activeView === 'tools' ? 'active' : ''}`}
+                onClick={() => {
                   setActiveView('tools');
-                  setActiveSubTool('serpGenerator');
-                  setSerpTitle(activeProject?.name || 'Titlu Pagina');
-                  setSerpDesc('Descriere scurta a paginii tale optimizata pentru Google.');
-                  setSerpUrl(activeProject?.domain || 'www.site-ul-tau.ro');
-                } },
-                { name: 'Sitemap XML Generator', active: activeView === 'tools' && activeSubTool === 'sitemapGenerator', onClick: () => { setActiveView('tools'); setActiveSubTool('sitemapGenerator'); } },
-                { name: 'Robots.txt Editor', active: activeView === 'tools' && activeSubTool === 'robotsEditor', onClick: () => { setActiveView('tools'); setActiveSubTool('robotsEditor'); } },
-                { name: 'Detector Link-uri Rupte', active: activeView === 'tools' && activeSubTool === 'brokenLinkFinder', onClick: () => { setActiveView('tools'); setActiveSubTool('brokenLinkFinder'); } }
-              ].map(sub => (
-                <div 
-                  key={sub.name}
-                  className={`submenu-item ${sub.active ? 'active' : ''}`}
-                  onClick={() => {
-                    sub.onClick();
-                    setIsMobileMenuOpen(false);
-                  }}
-                >
-                  {sub.name}
+                  setActiveSubTool(null);
+                  setToolsExpanded(!toolsExpanded);
+                }}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Wrench />
+                  <span>Unelte SEO</span>
                 </div>
-              ))}
-            </div>
-          )}
+                {toolsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </div>
+              {toolsExpanded && (
+                <div className="tools-submenu">
+                  {[
+                    { name: 'SEO Checker', active: activeView === 'dashboard', onClick: () => { setActiveView('dashboard'); setDiagCurrentPage(1); } },
+                    { name: 'Keyword Checker', active: activeView === 'rankings', onClick: () => { setActiveView('rankings'); setRankingsCurrentPage(1); } },
+                    { name: 'Keyword Research Tool', active: activeView === 'tools' && activeSubTool === 'keywordResearch', onClick: () => { setActiveView('tools'); setActiveSubTool('keywordResearch'); } },
+                    { name: 'SEO Compare', active: activeView === 'tools' && activeSubTool === 'seoCompare', onClick: () => { setActiveView('tools'); setActiveSubTool('seoCompare'); } },
+                    { name: 'Ranking Checker', active: activeView === 'tools' && activeSubTool === 'rankingChecker', onClick: () => { setActiveView('tools'); setActiveSubTool('rankingChecker'); } },
+                    { name: 'TF*IDF Tool', active: activeView === 'editor', onClick: () => { setActiveView('editor'); } },
+                    { name: 'Backlink Checker', active: activeView === 'backlinks', onClick: () => { setActiveView('backlinks'); setBacklinksCurrentPage(1); } },
+                    { name: 'Redirect Checker', active: activeView === 'tools' && activeSubTool === 'redirectChecker', onClick: () => { setActiveView('tools'); setActiveSubTool('redirectChecker'); } },
+                    { name: 'SERP Snippet Generator', active: activeView === 'tools' && activeSubTool === 'serpGenerator', onClick: () => {
+                      setActiveView('tools');
+                      setActiveSubTool('serpGenerator');
+                      setSerpTitle(activeProject?.name || 'Titlu Pagina');
+                      setSerpDesc('Descriere scurta a paginii tale optimizata pentru Google.');
+                      setSerpUrl(activeProject?.domain || 'www.site-ul-tau.ro');
+                    } },
+                    { name: 'Sitemap XML Generator', active: activeView === 'tools' && activeSubTool === 'sitemapGenerator', onClick: () => { setActiveView('tools'); setActiveSubTool('sitemapGenerator'); } },
+                    { name: 'Robots.txt Editor', active: activeView === 'tools' && activeSubTool === 'robotsEditor', onClick: () => { setActiveView('tools'); setActiveSubTool('robotsEditor'); } },
+                    { name: 'Detector Link-uri Rupte', active: activeView === 'tools' && activeSubTool === 'brokenLinkFinder', onClick: () => { setActiveView('tools'); setActiveSubTool('brokenLinkFinder'); } }
+                  ].map(sub => (
+                    <div 
+                      key={sub.name}
+                      className={`submenu-item ${sub.active ? 'active' : ''}`}
+                      onClick={() => {
+                        sub.onClick();
+                        setIsMobileMenuOpen(false);
+                      }}
+                    >
+                      {sub.name}
+                    </div>
+                  ))}
+                </div>
+              )}
 
-          <div 
-            className={`menu-item ${activeView === 'settings' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveView('settings');
-              setIsMobileMenuOpen(false);
-            }}
-          >
-            <Settings />
-            <span>Setări</span>
-          </div>
+              <div 
+                className={`menu-item ${activeView === 'settings' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveView('settings');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <CheckSquare />
+                <span>Setări</span>
+              </div>
+            </>
+          )}
 
           {currentUser?.role === 'admin' && (
             <div 
