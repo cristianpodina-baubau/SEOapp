@@ -351,6 +351,11 @@ body {
   transition: var(--transition);
 }
 
+.select-field option {
+  background-color: #0f0722;
+  color: #fff;
+}
+
 .select-field:focus {
   outline: none;
   border-color: var(--primary);
