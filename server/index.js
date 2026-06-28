@@ -23,7 +23,8 @@ import {
   getUsers,
   saveUsers,
   getAdminTokens,
-  saveAdminTokens
+  saveAdminTokens,
+  initDb
 } from './db.js';
 
 dotenv.config();
@@ -141,13 +142,13 @@ app.get('/api/crawl/stream', (req, res) => {
     res.write(`data: ${JSON.stringify({ type: 'page', page })}\n\n`);
   };
 
-  crawler.onFinished = (pages) => {
+  crawler.onFinished = async (pages) => {
     console.log(`[Crawler] Scanare completată. Total pagini scanate: ${pages.length}`);
     
     // Auto-save results to project file if projectId is present
     if (projectId) {
       try {
-        const projectData = getProjectData(projectId);
+        const projectData = await getProjectData(projectId);
         
         // Initialize history if missing
         if (!projectData.history) {
@@ -167,7 +168,7 @@ app.get('/api/crawl/stream', (req, res) => {
 
         projectData.pages = pages;
         projectData.lastCrawlTime = new Date().toISOString();
-        saveProjectData(projectId, projectData);
+        await saveProjectData(projectId, projectData);
         console.log(`[Crawler] Rezultate salvate cu succes pentru proiectul: ${projectId}`);
       } catch (err) {
         console.error(`[Crawler] Eroare la salvarea paginilor pentru proiectul ${projectId}:`, err.message);
@@ -239,7 +240,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
     const user = await getUserInfo(tokens);
 
     if (user.email && (user.email.toLowerCase() === 'cristianpodina@gmail.com' || user.email.toLowerCase() === 'seo.user@gmail.com')) {
-      saveAdminTokens(tokens);
+      await saveAdminTokens(tokens);
       console.log(`[Google Auth] Tokenurile de acces pentru Administratorul ${user.email} au fost salvate pe server.`);
     }
 
@@ -255,9 +256,9 @@ app.post('/api/auth/google/callback', async (req, res) => {
 // ==========================================
 
 // Login route
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password, googleEmail } = req.body;
-  const users = getUsers();
+  const users = await getUsers();
 
   // Handle Google Login matching email
   if (googleEmail) {
@@ -273,7 +274,7 @@ app.post('/api/auth/login', (req, res) => {
           email: emailLower
         };
         users.push(adminUser);
-        saveUsers(users);
+        await saveUsers(users);
       }
       return res.json({ success: true, user: adminUser });
     }
@@ -304,9 +305,9 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // Get all users
-app.get('/api/users', (req, res) => {
+app.get('/api/users', async (req, res) => {
   try {
-    const users = getUsers();
+    const users = await getUsers();
     const safeUsers = users.map(({ password: _, ...u }) => u);
     res.json(safeUsers);
   } catch (error) {
@@ -315,7 +316,7 @@ app.get('/api/users', (req, res) => {
 });
 
 // Create new user
-app.post('/api/users', (req, res) => {
+app.post('/api/users', async (req, res) => {
   const { name, username, password, role, email, allowedProjects } = req.body;
 
   if (!name || !username || !password) {
@@ -323,7 +324,7 @@ app.post('/api/users', (req, res) => {
   }
 
   try {
-    const users = getUsers();
+    const users = await getUsers();
 
     if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
       return res.status(400).json({ error: 'Numele de utilizator este deja folosit.' });
@@ -340,7 +341,7 @@ app.post('/api/users', (req, res) => {
     };
 
     users.push(newUser);
-    saveUsers(users);
+    await saveUsers(users);
 
     const { password: _, ...safeUser } = newUser;
     res.status(201).json(safeUser);
@@ -350,7 +351,7 @@ app.post('/api/users', (req, res) => {
 });
 
 // Delete user
-app.delete('/api/users/:id', (req, res) => {
+app.delete('/api/users/:id', async (req, res) => {
   const { id } = req.params;
 
   if (id === 'usr_admin') {
@@ -358,14 +359,14 @@ app.delete('/api/users/:id', (req, res) => {
   }
 
   try {
-    const users = getUsers();
+    const users = await getUsers();
     const filtered = users.filter(u => u.id !== id);
 
     if (users.length === filtered.length) {
       return res.status(404).json({ error: 'Utilizatorul nu a fost găsit.' });
     }
 
-    saveUsers(filtered);
+    await saveUsers(filtered);
     res.json({ message: 'Utilizator șters cu succes.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -382,7 +383,7 @@ app.post('/api/google/search-console', async (req, res) => {
     return res.status(400).json({ error: 'Domeniul este obligatoriu.' });
   }
 
-  const activeTokens = getAdminTokens() || tokens;
+  const activeTokens = (await getAdminTokens()) || tokens;
   if (!activeTokens) {
     return res.status(400).json({ error: 'Tokenurile de conectare Google lipsec.' });
   }
@@ -398,7 +399,7 @@ app.post('/api/google/search-console', async (req, res) => {
 app.post('/api/google/analytics', async (req, res) => {
   const { tokens, propertyId } = req.body;
 
-  const activeTokens = getAdminTokens() || tokens;
+  const activeTokens = (await getAdminTokens()) || tokens;
   if (!activeTokens) {
     return res.status(400).json({ error: 'Tokenurile de conectare Google lipsec.' });
   }
@@ -414,7 +415,7 @@ app.post('/api/google/analytics', async (req, res) => {
 app.post('/api/google/ads', async (req, res) => {
   const { tokens } = req.body;
 
-  const activeTokens = getAdminTokens() || tokens;
+  const activeTokens = (await getAdminTokens()) || tokens;
   if (!activeTokens) {
     return res.status(400).json({ error: 'Tokenurile de conectare Google lipsec.' });
   }
@@ -431,12 +432,12 @@ app.post('/api/google/ads', async (req, res) => {
 // PROJECTS API ENDPOINTS
 // ==========================================
 
-app.get('/api/projects', (req, res) => {
+app.get('/api/projects', async (req, res) => {
   const { userId } = req.query;
   try {
-    let list = getProjects();
+    let list = await getProjects();
     if (userId) {
-      const users = getUsers();
+      const users = await getUsers();
       const user = users.find(u => u.id === userId);
       if (user && user.role !== 'admin') {
         const allowed = user.allowedProjects || [];
@@ -449,14 +450,14 @@ app.get('/api/projects', (req, res) => {
   }
 });
 
-app.post('/api/projects', (req, res) => {
+app.post('/api/projects', async (req, res) => {
   const { name, domain } = req.body;
   if (!name || !domain) {
     return res.status(400).json({ error: 'Numele și domeniul sunt obligatorii.' });
   }
 
   try {
-    const projects = getProjects();
+    const projects = await getProjects();
     
     // Add protocol to domain if missing
     let cleanDomain = domain.trim();
@@ -473,10 +474,10 @@ app.post('/api/projects', (req, res) => {
     };
 
     projects.push(newProject);
-    saveProjects(projects);
+    await saveProjects(projects);
 
     // Initialize empty project data file
-    saveProjectData(newProject.id, {
+    await saveProjectData(newProject.id, {
       pages: [],
       editorText: '',
       targetKeywords: 'seo, optimizare, site',
@@ -489,19 +490,19 @@ app.post('/api/projects', (req, res) => {
   }
 });
 
-app.delete('/api/projects/:id', (req, res) => {
+app.delete('/api/projects/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const projects = getProjects();
+    const projects = await getProjects();
     const filtered = projects.filter(p => p.id !== id);
     
     if (projects.length === filtered.length) {
       return res.status(404).json({ error: 'Proiectul nu a fost găsit.' });
     }
 
-    saveProjects(filtered);
-    deleteProjectFiles(id);
+    await saveProjects(filtered);
+    await deleteProjectFiles(id);
 
     res.json({ message: 'Proiect șters cu succes.' });
   } catch (error) {
@@ -509,12 +510,12 @@ app.delete('/api/projects/:id', (req, res) => {
   }
 });
 
-app.get('/api/projects/:id/data', (req, res) => {
+app.get('/api/projects/:id/data', async (req, res) => {
   const { id } = req.params;
   const { userId } = req.query;
 
   if (userId) {
-    const users = getUsers();
+    const users = await getUsers();
     const user = users.find(u => u.id === userId);
     if (user && user.role !== 'admin') {
       const allowed = user.allowedProjects || [];
@@ -525,20 +526,20 @@ app.get('/api/projects/:id/data', (req, res) => {
   }
 
   try {
-    const data = getProjectData(id);
+    const data = await getProjectData(id);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/projects/:id/data', (req, res) => {
+app.post('/api/projects/:id/data', async (req, res) => {
   const { id } = req.params;
   const { userId } = req.query;
   const { pages, editorText, targetKeywords, googlePropertyId } = req.body;
 
   if (userId) {
-    const users = getUsers();
+    const users = await getUsers();
     const user = users.find(u => u.id === userId);
     if (user && user.role !== 'admin') {
       const allowed = user.allowedProjects || [];
@@ -549,7 +550,7 @@ app.post('/api/projects/:id/data', (req, res) => {
   }
 
   try {
-    const data = getProjectData(id);
+    const data = await getProjectData(id);
     
     if (pages !== undefined) data.pages = pages;
     if (editorText !== undefined) data.editorText = editorText;
@@ -558,15 +559,15 @@ app.post('/api/projects/:id/data', (req, res) => {
       data.googlePropertyId = googlePropertyId;
       
       // Update property id in main projects index too
-      const projects = getProjects();
+      const projects = await getProjects();
       const index = projects.findIndex(p => p.id === id);
       if (index !== -1) {
         projects[index].googlePropertyId = googlePropertyId;
-        saveProjects(projects);
+        await saveProjects(projects);
       }
     }
 
-    saveProjectData(id, data);
+    await saveProjectData(id, data);
     res.json({ message: 'Date salvate cu succes.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -615,6 +616,7 @@ app.get('*', (req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`[SEOapp Server] Rulează pe portul http://localhost:${PORT}`);
+  await initDb();
 });

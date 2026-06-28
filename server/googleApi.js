@@ -118,7 +118,7 @@ export async function refreshAndGetTokens(tokens) {
       const { credentials } = await auth.refreshAccessToken();
       
       const updatedTokens = { ...tokens, ...credentials };
-      saveAdminTokens(updatedTokens);
+      await saveAdminTokens(updatedTokens);
       console.log('[Google Auth] Tokenul de acces Google a fost reîmprospătat și salvat pe server.');
       return updatedTokens;
     } catch (e) {
