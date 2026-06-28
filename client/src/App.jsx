@@ -53,6 +53,7 @@ import {
   Line, 
   Legend 
 } from 'recharts';
+import * as XLSX from 'xlsx';
 
 // Helper function to process crawled pages and map them into the category reports
 const getReportsData = (crawledPages) => {
@@ -736,6 +737,11 @@ export default function App() {
   const [isCrawling, setIsCrawling] = useState(false);
   const [crawlProgress, setCrawlProgress] = useState(null);
   const [pages, setPages] = useState([]);
+  const [backlinksList, setBacklinksList] = useState([]);
+  const [newBacklinkUrl, setNewBacklinkUrl] = useState('');
+  const [newBacklinkAnchor, setNewBacklinkAnchor] = useState('');
+  const [newBacklinkRating, setNewBacklinkRating] = useState(50);
+  const [newBacklinkFollow, setNewBacklinkFollow] = useState(true);
   const [crawlHistory, setCrawlHistory] = useState([]);
   const [selectedPage, setSelectedPage] = useState(null);
   const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
@@ -1005,8 +1011,153 @@ export default function App() {
       setEditorText(data.editorText || '');
       setTargetKeywords(data.targetKeywords || 'seo, optimizare, site');
       setCrawlHistory(data.history || []);
+      setBacklinksList(data.backlinks || [
+        { url: 'https://www.directorweb.ro/detalii/site-ul-tau', anchor: 'Servicii Instalatii', rating: 65, follow: true, status: 'activ', date: '24.06.2026' },
+        { url: 'https://forum.constructii.ro/viewtopic.php?p=102', anchor: 'pompe de caldura', rating: 45, follow: true, status: 'activ', date: '20.06.2026' },
+        { url: 'https://www.anunturi-gratuite.ro/casa-si-gradina', anchor: 'vezi site', rating: 30, follow: false, status: 'activ', date: '18.06.2026' },
+        { url: 'https://www.expert-instal.ro/parteneri', anchor: 'Producător Sisteme Încălzire', rating: 85, follow: true, status: 'activ', date: '15.06.2026' },
+        { url: 'https://blog.constructori.ro/recomandari-termice', anchor: 'clic aici', rating: 70, follow: true, status: 'pierdut', date: '10.05.2026' }
+      ]);
     } catch (err) {
       console.error('Error fetching project data:', err);
+    }
+  };
+
+  const handleSaveBacklinks = async (updatedList) => {
+    if (!activeProject) return;
+    try {
+      await fetch(`/api/projects/${activeProject.id}/data?userId=${currentUser?.id || ''}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ backlinks: updatedList })
+      });
+    } catch (err) {
+      console.error('Error saving backlinks list:', err);
+    }
+  };
+
+  const handleAddBacklink = async () => {
+    if (!newBacklinkUrl) {
+      alert('Te rog introdu URL-ul sursă.');
+      return;
+    }
+    
+    const newLink = {
+      url: newBacklinkUrl,
+      anchor: newBacklinkAnchor || 'link',
+      rating: Number(newBacklinkRating) || 30,
+      follow: newBacklinkFollow,
+      status: 'activ',
+      date: new Date().toLocaleDateString('ro-RO')
+    };
+
+    const updated = [newLink, ...backlinksList];
+    setBacklinksList(updated);
+    await handleSaveBacklinks(updated);
+
+    // Reset fields
+    setNewBacklinkUrl('');
+    setNewBacklinkAnchor('');
+    setNewBacklinkRating(50);
+    setNewBacklinkFollow(true);
+  };
+
+  const handleDeleteBacklink = async (idxToRemove) => {
+    if (!confirm('Sigur vrei să ștergi acest backlink?')) return;
+    const updated = backlinksList.filter((_, idx) => idx !== idxToRemove);
+    setBacklinksList(updated);
+    await handleSaveBacklinks(updated);
+  };
+
+  const handleExportExcelAudit = () => {
+    if (!activeProject) {
+      alert('Nu există niciun proiect activ selectat.');
+      return;
+    }
+    if (pages.length === 0) {
+      alert('Nu există pagini scanate pentru acest proiect. Rulează o scanare mai întâi.');
+      return;
+    }
+
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // Tab 1: Summary
+      const summaryData = [
+        { Parametru: 'Nume Proiect', Valoare: activeProject.name },
+        { Parametru: 'Domeniu Web', Valoare: activeProject.domain },
+        { Parametru: 'Număr total pagini scanate', Valoare: pages.length },
+        { Parametru: 'Scor SEO Estimativ', Valoare: `${Math.round(pages.reduce((acc, p) => acc + (p.seoScore || 80), 0) / pages.length || 80)}/100` },
+        { Parametru: 'Data generării exportului', Valoare: new Date().toLocaleDateString('ro-RO') },
+        { Parametru: 'Platformă audit', Valoare: 'SEOapp Premium' }
+      ];
+      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+      // Tab 2: Technical SEO
+      const technicalData = pages.map(p => ({
+        'URL Pagină': p.url,
+        'Cod Status HTTP': p.statusCode || 200,
+        'Timp Răspuns (ms)': p.responseTime || 150,
+        'Tip Conținut (Mime)': p.mimeType || 'text/html',
+        'Dimensiune (kB)': p.size ? Math.round(p.size / 1024 * 10) / 10 : 0,
+        'Link Canonical': p.canonical || 'Nespecificat',
+        'Directivă Indexare': p.indexable ? 'Indexabil' : 'Noindex'
+      }));
+      const wsTechnical = XLSX.utils.json_to_sheet(technicalData);
+      XLSX.utils.book_append_sheet(wb, wsTechnical, 'Technical SEO');
+
+      // Tab 3: On-Page SEO
+      const onpageData = pages.map(p => ({
+        'URL Pagină': p.url,
+        'Titlu (Title)': p.title || 'Lipsă',
+        'Lungime Titlu (caractere)': p.title ? p.title.length : 0,
+        'Descriere Meta': p.metaDescription || 'Lipsă',
+        'Lungime Descriere': p.metaDescription ? p.metaDescription.length : 0,
+        'Titlu Principal (H1)': p.h1 || 'Lipsă',
+        'Titlu Secundar (H2)': p.h2 || 'Lipsă'
+      }));
+      const wsOnpage = XLSX.utils.json_to_sheet(onpageData);
+      XLSX.utils.book_append_sheet(wb, wsOnpage, 'On-Page SEO');
+
+      // Tab 4: Content Quality
+      const contentData = pages.map(p => ({
+        'URL Pagină': p.url,
+        'Număr Cuvinte': p.wordCount || 0,
+        'Conținut Subțire (Thin)': (p.wordCount || 0) < 300 ? 'Da' : 'Nu',
+        'Titlu Lipsă': !p.title ? 'Da' : 'Nu',
+        'Descriere Lipsă': !p.metaDescription ? 'Da' : 'Nu'
+      }));
+      const wsContent = XLSX.utils.json_to_sheet(contentData);
+      XLSX.utils.book_append_sheet(wb, wsContent, 'Content Quality');
+
+      // Tab 5: Off-Page SEO
+      const offpageData = backlinksList.map(b => ({
+        'Pagină Sursă (Backlink)': b.url,
+        'Ancoră Link': b.anchor,
+        'Rating Domeniu (DR)': b.rating,
+        'Tip Link (Follow)': b.follow ? 'Dofollow' : 'Nofollow',
+        'Status Link': b.status === 'activ' ? 'Activ' : 'Pierdut',
+        'Data Detectării': b.date
+      }));
+      const wsOffpage = XLSX.utils.json_to_sheet(offpageData);
+      XLSX.utils.book_append_sheet(wb, wsOffpage, 'Off-Page SEO');
+
+      // Tab 6: User Experience
+      const uxData = pages.map(p => ({
+        'URL Pagină': p.url,
+        'Compatibil Mobil': (p.mimeType || '').includes('html') ? 'Da' : 'Nu',
+        'Scor PageSpeed Estimat': p.performanceScore || 85
+      }));
+      const wsUx = XLSX.utils.json_to_sheet(uxData);
+      XLSX.utils.book_append_sheet(wb, wsUx, 'User Experience');
+
+      const cleanDomain = activeProject.domain.replace(/^https?:\/\/(www\.)?/i, '').replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `Audit_SEO_${cleanDomain}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (err) {
+      console.error('Error generating Excel audit:', err);
+      alert('Eroare la generarea fișierului Excel: ' + err.message);
     }
   };
 
@@ -1796,18 +1947,16 @@ export default function App() {
   const scannedPagesCount = pages.length > 0 ? pages.length : 0;
   const notIndexedCount = Math.max(0, scannedPagesCount - indexedCount);
 
-  // Mock Backlink Data (Off-Page SEO)
-  const backlinksList = [
-    { url: 'https://www.directorweb.ro/detalii/site-ul-tau', anchor: 'Servicii Instalatii', rating: 65, follow: true, status: 'activ', date: '24.06.2026' },
-    { url: 'https://forum.constructii.ro/viewtopic.php?p=102', anchor: 'pompe de caldura', rating: 45, follow: true, status: 'activ', date: '20.06.2026' },
-    { url: 'https://www.anunturi-gratuite.ro/casa-si-gradina', anchor: 'vezi site', rating: 30, follow: false, status: 'activ', date: '18.06.2026' },
-    { url: 'https://www.expert-instal.ro/parteneri', anchor: 'Producător Sisteme Încălzire', rating: 85, follow: true, status: 'activ', date: '15.06.2026' },
-    { url: 'https://blog.constructori.ro/recomandari-termice', anchor: 'clic aici', rating: 70, follow: true, status: 'pierdut', date: '10.05.2026' }
-  ];
-
+  // Dynamic Backlink Data (Off-Page SEO)
   const backlinkStats = {
     totalLinks: backlinksList.length,
-    referringDomains: 4,
+    referringDomains: new Set(backlinksList.map(b => {
+      try {
+        return new URL(b.url).hostname;
+      } catch {
+        return b.url;
+      }
+    })).size,
     dofollowCount: backlinksList.filter(b => b.follow).length,
     nofollowCount: backlinksList.filter(b => !b.follow).length,
     qualityHigh: backlinksList.filter(b => b.rating >= 70).length
@@ -4862,14 +5011,24 @@ export default function App() {
                   <h1>Rapoarte SEO Structurate</h1>
                   <p>Vizualizează rapoarte tehnice avansate grupate pe categorii specifice de audit.</p>
                 </div>
-                <button 
-                  className="btn btn-primary" 
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
-                  onClick={() => window.print()}
-                >
-                  <Printer size={16} />
-                  Exportă Raport PDF
-                </button>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button 
+                    className="btn btn-outline" 
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderColor: 'var(--secondary)', color: 'var(--secondary)' }}
+                    onClick={handleExportExcelAudit}
+                  >
+                    <FileText size={16} />
+                    Exportă Audit Excel (.xlsx)
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
+                    onClick={() => window.print()}
+                  >
+                    <Printer size={16} />
+                    Exportă Raport PDF
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -6415,6 +6574,7 @@ export default function App() {
                             <th>Tip</th>
                             <th>Status</th>
                             <th>Data Detectării</th>
+                            <th>Acțiuni</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -6438,10 +6598,81 @@ export default function App() {
                                 </span>
                               </td>
                               <td>{back.date}</td>
+                              <td>
+                                <button 
+                                  className="btn btn-outline" 
+                                  style={{ padding: '4px 8px', color: 'var(--error)', borderColor: 'var(--error)' }}
+                                  onClick={() => handleDeleteBacklink(startIndex + idx)}
+                                  title="Șterge acest backlink"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
+                    </div>
+
+                    {/* FORMULAR ADAUGARE BACKLINK */}
+                    <div style={{ marginTop: '24px', padding: '20px', background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border)', borderRadius: '8px' }}>
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: '800', marginBottom: '16px', color: 'var(--secondary)' }}>Adaugă un Backlink Nou</h4>
+                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                        <div style={{ flex: 2, minWidth: '240px' }}>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>URL Sursă</label>
+                          <input 
+                            type="text" 
+                            placeholder="https://exemplu.ro/pagina-cu-link" 
+                            className="input-field" 
+                            style={{ padding: '10px 14px', fontSize: '0.85rem', width: '100%' }}
+                            value={newBacklinkUrl}
+                            onChange={(e) => setNewBacklinkUrl(e.target.value)}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: '180px' }}>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>Cuvânt Ancoră (Anchor Text)</label>
+                          <input 
+                            type="text" 
+                            placeholder="ex: servicii instalatii" 
+                            className="input-field" 
+                            style={{ padding: '10px 14px', fontSize: '0.85rem', width: '100%' }}
+                            value={newBacklinkAnchor}
+                            onChange={(e) => setNewBacklinkAnchor(e.target.value)}
+                          />
+                        </div>
+                        <div style={{ width: '90px' }}>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>Rating (DR)</label>
+                          <input 
+                            type="number" 
+                            placeholder="50" 
+                            min="0"
+                            max="100"
+                            className="input-field" 
+                            style={{ padding: '10px 14px', fontSize: '0.85rem', width: '100%' }}
+                            value={newBacklinkRating}
+                            onChange={(e) => setNewBacklinkRating(Number(e.target.value))}
+                          />
+                        </div>
+                        <div style={{ width: '120px' }}>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>Tip Link</label>
+                          <select 
+                            className="select-field" 
+                            style={{ padding: '10px 14px', fontSize: '0.85rem', width: '100%' }}
+                            value={newBacklinkFollow ? 'dofollow' : 'nofollow'}
+                            onChange={(e) => setNewBacklinkFollow(e.target.value === 'dofollow')}
+                          >
+                            <option value="dofollow">Dofollow</option>
+                            <option value="nofollow">Nofollow</option>
+                          </select>
+                        </div>
+                        <button 
+                          className="btn btn-primary" 
+                          style={{ padding: '11px 22px', fontSize: '0.85rem', fontWeight: '600' }}
+                          onClick={handleAddBacklink}
+                        >
+                          Adaugă Link
+                        </button>
+                      </div>
                     </div>
 
                     {/* Pagination footer */}

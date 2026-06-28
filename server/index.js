@@ -731,7 +731,7 @@ app.get('/api/projects/:id/data', async (req, res) => {
 app.post('/api/projects/:id/data', async (req, res) => {
   const { id } = req.params;
   const { userId } = req.query;
-  const { pages, editorText, targetKeywords, googlePropertyId } = req.body;
+  const { pages, editorText, targetKeywords, googlePropertyId, backlinks } = req.body;
 
   if (userId) {
     const users = await getUsers();
@@ -750,6 +750,7 @@ app.post('/api/projects/:id/data', async (req, res) => {
     if (pages !== undefined) data.pages = pages;
     if (editorText !== undefined) data.editorText = editorText;
     if (targetKeywords !== undefined) data.targetKeywords = targetKeywords;
+    if (backlinks !== undefined) data.backlinks = backlinks;
     if (googlePropertyId !== undefined) {
       data.googlePropertyId = googlePropertyId;
       
