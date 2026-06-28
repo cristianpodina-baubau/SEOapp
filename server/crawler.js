@@ -361,7 +361,10 @@ export class SiteCrawler {
     if (this.queue.length === 0) {
       // Check if there are any active pages currently loading
       const isStillLoading = Array.from(this.crawledPages.values()).some(p => p.status === 'loading');
-      if (!isStillLoading) {
+      if (isStillLoading) {
+        // Queue is temporarily empty but other pages are still loading. Wait and check again.
+        setTimeout(() => this.crawlNext(), 150);
+      } else {
         this.finish();
       }
       return;
@@ -387,7 +390,11 @@ export class SiteCrawler {
 
     // Add placeholder to avoid double fetches
     this.crawledPages.set(normalized, { status: 'loading', url: normalized });
-    this.notifyProgress();
+    try {
+      this.notifyProgress();
+    } catch (err) {
+      console.error('[Crawler Progress Error]', err.message);
+    }
 
     const startTime = Date.now();
     try {
@@ -469,7 +476,11 @@ export class SiteCrawler {
       });
     }
 
-    this.notifyProgress();
+    try {
+      this.notifyProgress();
+    } catch (err) {
+      console.error('[Crawler Progress Error]', err.message);
+    }
     // Non-blocking timeout for next page
     setTimeout(() => this.crawlNext(), 100);
   }

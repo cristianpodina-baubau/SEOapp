@@ -224,7 +224,11 @@ app.get('/api/crawl/stream', (req, res) => {
   crawler.onProgress = (stats) => {
     activeCrawl.stats = stats;
     activeCrawl.listeners.forEach(listener => {
-      listener.write(`data: ${JSON.stringify({ type: 'progress', stats })}\n\n`);
+      try {
+        listener.write(`data: ${JSON.stringify({ type: 'progress', stats })}\n\n`);
+      } catch (err) {
+        console.error('[SSE Progress Error] Failed to write:', err.message);
+      }
     });
   };
 
@@ -232,7 +236,11 @@ app.get('/api/crawl/stream', (req, res) => {
     console.log(`[Crawler] Scanat cu succes: ${page.url} (Scor: ${page.score}, Status: ${page.statusCode || 200})`);
     activeCrawl.pages.push(page);
     activeCrawl.listeners.forEach(listener => {
-      listener.write(`data: ${JSON.stringify({ type: 'page', page })}\n\n`);
+      try {
+        listener.write(`data: ${JSON.stringify({ type: 'page', page })}\n\n`);
+      } catch (err) {
+        console.error('[SSE Page Error] Failed to write:', err.message);
+      }
     });
   };
 
@@ -268,8 +276,12 @@ app.get('/api/crawl/stream', (req, res) => {
 
     // Notify all active listeners and close connections
     activeCrawl.listeners.forEach(listener => {
-      listener.write(`data: ${JSON.stringify({ type: 'finished', pages })}\n\n`);
-      listener.end();
+      try {
+        listener.write(`data: ${JSON.stringify({ type: 'finished', pages })}\n\n`);
+        listener.end();
+      } catch (err) {
+        console.error('[SSE Finished Error] Failed to write or end:', err.message);
+      }
     });
 
     // Remove from active list
