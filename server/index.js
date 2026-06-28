@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { SiteCrawler } from './crawler.js';
@@ -274,6 +275,117 @@ app.get('/api/crawl/stream', (req, res) => {
     console.log(`[Crawler] Conexiune închisă de clientul inițial. Scanarea continuă în fundal pe server.`);
     activeCrawl.listeners = activeCrawl.listeners.filter(l => l !== res);
   });
+});
+
+// ==========================================
+// EXCEL TASKS ENDPOINT
+// ==========================================
+app.get('/api/excel-tasks', (req, res) => {
+  const unzipDir = 'C:\\Users\\crist\\.gemini\\antigravity\\brain\\2cbfba91-f2dc-4304-981a-3da0ea0e25a1\\scratch\\sheet_unzipped';
+  try {
+    const stringsPath = path.join(unzipDir, 'xl', 'sharedStrings.xml');
+    const sharedStrings = [];
+    if (fs.existsSync(stringsPath)) {
+      const stringsContent = fs.readFileSync(stringsPath, 'utf8');
+      const tRegex = /<t[^>]*>([\s\S]*?)<\/t>/g;
+      let match;
+      while ((match = tRegex.exec(stringsContent)) !== null) {
+        sharedStrings.push(match[1]);
+      }
+    }
+
+    const workbookPath = path.join(unzipDir, 'xl', 'workbook.xml');
+    if (!fs.existsSync(workbookPath)) {
+      return res.json([]);
+    }
+    const workbookContent = fs.readFileSync(workbookPath, 'utf8');
+    const sheets = [];
+    const sheetRegex = /<sheet\s+[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"/g;
+    let sheetMatch;
+    while ((sheetMatch = sheetRegex.exec(workbookContent)) !== null) {
+      sheets.push({ name: sheetMatch[1], rId: sheetMatch[2] });
+    }
+
+    const relsPath = path.join(unzipDir, 'xl', '_rels', 'workbook.xml.rels');
+    const relsContent = fs.readFileSync(relsPath, 'utf8');
+    const rels = {};
+    const relRegex = /<Relationship\s+[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g;
+    let relMatch;
+    while ((relMatch = relRegex.exec(relsContent)) !== null) {
+      rels[relMatch[1]] = relMatch[2];
+    }
+
+    const allTasks = [];
+
+    sheets.forEach(sheet => {
+      if (!['⚙️ Technical SEO', '📝 On-Page SEO', '📄 Content Quality', '🔗 Off-Page SEO', '👤 User Experience'].includes(sheet.name)) {
+        return;
+      }
+
+      const targetRel = rels[sheet.rId];
+      if (!targetRel) return;
+      const sheetPath = path.join(unzipDir, 'xl', targetRel);
+      if (!fs.existsSync(sheetPath)) return;
+
+      const sheetContent = fs.readFileSync(sheetPath, 'utf8');
+      const rowRegex = /<row[^>]*>([\s\S]*?)<\/row>/g;
+      let rowMatch;
+      const rows = [];
+
+      while ((rowMatch = rowRegex.exec(sheetContent)) !== null) {
+        const rowInner = rowMatch[1];
+        const cellRegex = /<c\s+[^>]*r="([A-Z]+)(\d+)"([^>]*)>([\s\S]*?)<\/c>/g;
+        let cellMatch;
+        const rowCells = {};
+
+        while ((cellMatch = cellRegex.exec(rowInner)) !== null) {
+          const colLetter = cellMatch[1];
+          const typeAttr = cellMatch[3];
+          const cellBody = cellMatch[4];
+
+          const vMatch = cellBody.match(/<v>([\s\S]*?)<\/v>/);
+          let value = vMatch ? vMatch[1] : '';
+
+          if (typeAttr.includes('t="s"') && value !== '') {
+            const strIndex = parseInt(value);
+            value = sharedStrings[strIndex] || '';
+          }
+          value = value.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+          rowCells[colLetter] = value.trim();
+        }
+
+        if (Object.keys(rowCells).length > 0) {
+          rows.push(rowCells);
+        }
+      }
+
+      rows.forEach(row => {
+        const checkItem = row['B'] || '';
+        const status = row['C'] || '';
+        const priority = row['D'] || '';
+        const notes = row['E'] || '';
+        const recommendation = row['F'] || '';
+        const impact = row['G'] || '';
+
+        if (status.includes('❌') || status.includes('⚠️') || status.toLowerCase().includes('fail') || status.toLowerCase().includes('warning')) {
+          allTasks.push({
+            category: sheet.name.replace(/[^\w\s-]/g, '').trim(),
+            title: checkItem,
+            status: status.includes('❌') ? 'Critical' : 'Warning',
+            priority: priority || 'Medium',
+            notes: notes,
+            recommendation: recommendation,
+            impact: impact
+          });
+        }
+      });
+    });
+
+    res.json(allTasks);
+  } catch (err) {
+    console.error('Error fetching excel tasks:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ==========================================

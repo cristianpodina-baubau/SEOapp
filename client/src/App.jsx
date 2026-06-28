@@ -5408,6 +5408,47 @@ export default function App() {
             return d.severity === todoSeverityFilter;
           });
 
+          const handleImportExcelTasks = async () => {
+            try {
+              const res = await fetch('/api/excel-tasks');
+              if (res.ok) {
+                const tasks = await res.json();
+                if (tasks.length === 0) {
+                  alert('Nu s-au găsit sarcini de importat din auditul Excel sau fișierul nu a fost încă încărcat.');
+                  return;
+                }
+                const newTodos = [...todoList];
+                let addedCount = 0;
+                tasks.forEach(t => {
+                  const id = 'excel_' + t.category.replace(/\s+/g, '_') + '_' + t.title.substring(0, 30).replace(/\s+/g, '_').toLowerCase();
+                  if (!newTodos.find(item => item.id === id)) {
+                    newTodos.push({
+                      id: id,
+                      title: `[${t.category}] ${t.title}`,
+                      severity: t.status === 'Critical' ? 'critical' : 'warning',
+                      count: 1,
+                      status: 'todo',
+                      notes: `Constatări: ${t.notes || ''}\nRecomandare: ${t.recommendation || ''}`,
+                      addedAt: Date.now()
+                    });
+                    addedCount++;
+                  }
+                });
+                if (addedCount > 0) {
+                  setTodoList(newTodos);
+                  alert(`S-au importat cu succes ${addedCount} sarcini noi din auditul Excel!`);
+                } else {
+                  alert('Toate sarcinile din auditul Excel sunt deja prezente în lista ta.');
+                }
+              } else {
+                alert('Eroare la preluarea sarcinilor de pe server.');
+              }
+            } catch (err) {
+              console.error('Eroare la importul sarcinilor:', err);
+              alert('A apărut o eroare la importul sarcinilor.');
+            }
+          };
+
           // Handlers to toggle task selection
           const toggleTask = (issue) => {
             const exists = todoList.find(t => t.id === issue.id);
@@ -5483,36 +5524,57 @@ export default function App() {
               </div>
 
               {/* TABS SELECTOR */}
-              <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <button
+                    className={`btn ${todoActiveTab === 'select' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+                    onClick={() => setTodoActiveTab('select')}
+                  >
+                    1. Selectează Probleme ({diagnostics.filter(d => d.count > 0).length} active)
+                  </button>
+                  <button
+                    className={`btn ${todoActiveTab === 'board' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={() => setTodoActiveTab('board')}
+                  >
+                    2. Lista mea To-Do ({todoList.length} planificate)
+                  </button>
+                  <button
+                    className={`btn ${todoActiveTab === 'history' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={() => setTodoActiveTab('history')}
+                  >
+                    <TrendingUp size={14} />
+                    3. Istoric & Evoluție
+                  </button>
+                  <button
+                    className={`btn ${todoActiveTab === 'notes' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={() => setTodoActiveTab('notes')}
+                  >
+                    <BookOpen size={14} />
+                    4. Note & Planificare AI
+                  </button>
+                </div>
+
                 <button
-                  className={`btn ${todoActiveTab === 'select' ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-                  onClick={() => setTodoActiveTab('select')}
+                  className="btn btn-outline"
+                  style={{ 
+                    padding: '8px 16px', 
+                    fontSize: '0.85rem', 
+                    borderColor: 'var(--warning)', 
+                    color: 'var(--warning)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    background: 'rgba(245,158,11,0.05)'
+                  }}
+                  onClick={handleImportExcelTasks}
+                  title="Importă automat sarcinile identificate în auditul tău Excel"
                 >
-                  1. Selectează Probleme ({diagnostics.filter(d => d.count > 0).length} active)
-                </button>
-                <button
-                  className={`btn ${todoActiveTab === 'board' ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  onClick={() => setTodoActiveTab('board')}
-                >
-                  2. Lista mea To-Do ({todoList.length} planificate)
-                </button>
-                <button
-                  className={`btn ${todoActiveTab === 'history' ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  onClick={() => setTodoActiveTab('history')}
-                >
-                  <TrendingUp size={14} />
-                  3. Istoric & Evoluție
-                </button>
-                <button
-                  className={`btn ${todoActiveTab === 'notes' ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  onClick={() => setTodoActiveTab('notes')}
-                >
-                  <BookOpen size={14} />
-                  4. Note & Planificare AI
+                  <FileText size={14} />
+                  Importă Audit Excel
                 </button>
               </div>
 
