@@ -26,7 +26,8 @@ import {
   getAdminTokens,
   saveAdminTokens,
   initDb,
-  getDbColumns
+  getDbColumns,
+  dbErrors
 } from './db.js';
 
 dotenv.config();
@@ -147,6 +148,10 @@ app.get('/api/diagnose-db', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get('/api/db-errors', (req, res) => {
+  res.json(dbErrors);
 });
 
 // ==========================================

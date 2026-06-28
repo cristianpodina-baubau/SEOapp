@@ -32,6 +32,8 @@ if (process.env.DATABASE_URL) {
   console.log('[DB] DATABASE_URL not set. Running in local JSON fallback mode.');
 }
 
+export const dbErrors = [];
+
 /**
  * Initializes database tables if using PostgreSQL.
  */
@@ -198,6 +200,7 @@ export async function saveProjectData(projectId, data) {
       return;
     } catch (e) {
       console.error('[DB saveProjectData Error]', e.message);
+      dbErrors.push({ timestamp: new Date().toISOString(), action: 'saveProjectData', error: e.message, stack: e.stack });
       return;
     }
   }
