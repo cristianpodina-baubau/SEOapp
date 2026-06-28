@@ -2516,7 +2516,9 @@ export default function App() {
             {projects.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
-            <option value="NEW">+ Proiect Nou</option>
+            {currentUser?.role === 'admin' && (
+              <option value="NEW">+ Proiect Nou</option>
+            )}
           </select>
         </div>
         
