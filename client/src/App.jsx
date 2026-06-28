@@ -4872,89 +4872,88 @@ export default function App() {
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '30px', alignItems: 'start' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 
-                {/* LEFT SIDEBAR FOR REPORT TABS */}
-                <div className="glass-card" style={{ padding: '16px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', position: 'sticky', top: '20px' }}>
-                  <h3 style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--text-muted)', padding: '0 8px 12px 8px', borderBottom: '1px solid var(--border)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                    Categorii Rapoarte
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {[
-                      { id: 'internal', label: 'Internal', icon: <Layers size={16} /> },
-                      { id: 'external', label: 'External', icon: <ExternalLink size={16} /> },
-                      { id: 'security', label: 'Security', icon: <ShieldCheck size={16} /> },
-                      { id: 'responseCodes', label: 'Response Codes', icon: <RefreshCw size={16} /> },
-                      { id: 'responseCodesInternal', label: 'Response Codes (Internal)', icon: <RefreshCw size={16} /> },
-                      { id: 'responseCodesExternal', label: 'Response Codes (External)', icon: <RefreshCw size={16} /> },
-                      { id: 'url', label: 'URL', icon: <Link2 size={16} /> },
-                      { id: 'pageTitles', label: 'Page Titles', icon: <FileText size={16} /> },
-                      { id: 'metaDescription', label: 'Meta Description', icon: <FileText size={16} /> },
-                      { id: 'metaKeywords', label: 'Meta Keywords', icon: <FileText size={16} /> },
-                      { id: 'h1', label: 'H1', icon: <FileText size={16} /> },
-                      { id: 'h2', label: 'H2', icon: <FileText size={16} /> },
-                      { id: 'content', label: 'Content', icon: <BookOpen size={16} /> },
-                      { id: 'images', label: 'Images', icon: <Layers size={16} /> },
-                      { id: 'canonicals', label: 'Canonicals', icon: <Link2 size={16} /> },
-                      { id: 'pagination', label: 'Pagination', icon: <Layers size={16} /> },
-                      { id: 'javascript', label: 'JavaScript', icon: <FileCode size={16} /> },
-                      { id: 'links', label: 'Links', icon: <Link2 size={16} /> },
-                      { id: 'amp', label: 'AMP', icon: <Target size={16} /> },
-                      { id: 'structuredData', label: 'Structured Data', icon: <FileCode size={16} /> },
-                      { id: 'sitemaps', label: 'Sitemaps', icon: <Compass size={16} /> },
-                      { id: 'pageSpeed', label: 'PageSpeed', icon: <TrendingUp size={16} /> },
-                      { id: 'customSearch', label: 'Custom Search', icon: <Search size={16} /> },
-                      { id: 'customExtraction', label: 'Custom Extraction', icon: <Search size={16} /> },
-                      { id: 'customJavaScript', label: 'Custom JavaScript', icon: <FileCode size={16} /> },
-                      { id: 'analytics', label: 'Analytics', icon: <MousePointerClick size={16} /> },
-                      { id: 'searchConsole', label: 'Search Console', icon: <Target size={16} /> },
-                      { id: 'validation', label: 'Validation', icon: <ShieldCheck size={16} /> }
-                    ].map(tab => {
-                      const isActive = activeReportTab === tab.id;
-                      let issuesCount = 0;
-                      if (tab.id !== 'internal' && tab.id !== 'external') {
-                        const tObj = reports[tab.id];
-                        if (tObj && tObj.filters) {
-                          issuesCount = tObj.filters
-                            .filter(f => f.id !== 'all' && (f.status === 'error' || f.status === 'warning'))
-                            .reduce((acc, f) => acc + (f.list?.length || 0), 0);
+                {/* CATEGORY SELECTOR DROPDOWN */}
+                <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                      Categorie Raport Audit:
+                    </span>
+                    <select
+                      className="select-field"
+                      style={{ 
+                        padding: '10px 16px', 
+                        fontSize: '0.9rem', 
+                        minWidth: '320px', 
+                        background: 'rgba(15,7,34,0.6)', 
+                        border: '1px solid var(--border)', 
+                        borderRadius: '8px', 
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        outline: 'none'
+                      }}
+                      value={activeReportTab}
+                      onChange={(e) => {
+                        setActiveReportTab(e.target.value);
+                        setSelectedReportFilter('all');
+                        setReportsCurrentPage(1);
+                      }}
+                    >
+                      {[
+                        { id: 'internal', label: 'Internal (Resurse Interne)' },
+                        { id: 'external', label: 'External (Resurse Externe)' },
+                        { id: 'security', label: 'Security (Securitate)' },
+                        { id: 'responseCodes', label: 'Response Codes (Coduri Răspuns)' },
+                        { id: 'responseCodesInternal', label: 'Response Codes (Internal)' },
+                        { id: 'responseCodesExternal', label: 'Response Codes (External)' },
+                        { id: 'url', label: 'URL Structure' },
+                        { id: 'pageTitles', label: 'Page Titles (Titluri Pagini)' },
+                        { id: 'metaDescription', label: 'Meta Description (Descrieri)' },
+                        { id: 'metaKeywords', label: 'Meta Keywords' },
+                        { id: 'h1', label: 'H1 Headings' },
+                        { id: 'h2', label: 'H2 Headings' },
+                        { id: 'content', label: 'Content Analysis (Conținut)' },
+                        { id: 'images', label: 'Images Audit (Imagini)' },
+                        { id: 'canonicals', label: 'Canonicals' },
+                        { id: 'pagination', label: 'Pagination (Paginație)' },
+                        { id: 'javascript', label: 'JavaScript Resources' },
+                        { id: 'links', label: 'Links (Link-uri Interne)' },
+                        { id: 'amp', label: 'AMP Mobile' },
+                        { id: 'structuredData', label: 'Structured Data (Schema)' },
+                        { id: 'sitemaps', label: 'Sitemaps XML' },
+                        { id: 'pageSpeed', label: 'PageSpeed Insights' },
+                        { id: 'customSearch', label: 'Custom Search' },
+                        { id: 'customExtraction', label: 'Custom Extraction' },
+                        { id: 'customJavaScript', label: 'Custom JavaScript' },
+                        { id: 'analytics', label: 'Google Analytics' },
+                        { id: 'searchConsole', label: 'Google Search Console' },
+                        { id: 'validation', label: 'W3C Validation' }
+                      ].map(tab => {
+                        let issuesLabel = '';
+                        if (tab.id !== 'internal' && tab.id !== 'external') {
+                          const tObj = reports[tab.id];
+                          if (tObj && tObj.filters) {
+                            const issuesCount = tObj.filters
+                              .filter(f => f.id !== 'all' && (f.status === 'error' || f.status === 'warning'))
+                              .reduce((acc, f) => acc + (f.list?.length || 0), 0);
+                            if (issuesCount > 0) {
+                              issuesLabel = ` (${issuesCount} erori)`;
+                            }
+                          }
                         }
-                      }
-                      
-                      return (
-                        <div
-                          key={tab.id}
-                          onClick={() => {
-                            setActiveReportTab(tab.id);
-                            setSelectedReportFilter('all');
-                            setReportsCurrentPage(1);
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            background: isActive ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
-                            borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-                            color: isActive ? '#fff' : 'var(--text-secondary)'
-                          }}
-                          className="report-tab-item"
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: isActive ? '600' : '500' }}>
-                            {tab.icon}
-                            <span>{tab.label}</span>
-                          </div>
-                          {issuesCount > 0 && (
-                            <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--error)', fontWeight: '700' }}>
-                              {issuesCount}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
+                        return (
+                          <option key={tab.id} value={tab.id} style={{ background: '#0f0722', color: '#fff' }}>
+                            {tab.label}{issuesLabel}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Toate datele sunt salvate în baza de date.
                   </div>
                 </div>
 
