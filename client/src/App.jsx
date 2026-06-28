@@ -2921,6 +2921,9 @@ export default function App() {
                       <option value={10} style={{ background: '#1e1b4b', color: '#fff' }}>10 pagini</option>
                       <option value={50} style={{ background: '#1e1b4b', color: '#fff' }}>50 pagini</option>
                       <option value={100} style={{ background: '#1e1b4b', color: '#fff' }}>100 pagini</option>
+                      <option value={500} style={{ background: '#1e1b4b', color: '#fff' }}>500 pagini</option>
+                      <option value={1000} style={{ background: '#1e1b4b', color: '#fff' }}>1000 pagini</option>
+                      <option value={5000} style={{ background: '#1e1b4b', color: '#fff' }}>5000 pagini</option>
                       <option value="ALL" style={{ background: '#1e1b4b', color: '#fff' }}>Toate paginile</option>
                     </select>
                   </div>
@@ -3112,7 +3115,13 @@ export default function App() {
                 <div className="progress-bar-container">
                   <div 
                     className="progress-bar-fill" 
-                    style={{ width: `${Math.min(100, (crawlProgress.totalCrawled / maxPages) * 100)}%` }}
+                    style={{ 
+                      width: `${
+                        maxPages === 10000 
+                          ? Math.min(100, (crawlProgress.totalCrawled / ((crawlProgress.totalCrawled + (crawlProgress.queueLength || 0)) || 1)) * 100)
+                          : Math.min(100, (crawlProgress.totalCrawled / maxPages) * 100)
+                      }%` 
+                    }}
                   ></div>
                 </div>
               </div>
