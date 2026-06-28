@@ -348,19 +348,36 @@ export class SiteCrawler {
     this.crawling = true;
     this.queue.push(this.startUrl);
     
-    // Start crawl loop
-    this.crawlNext();
+    // Start crawl loop with concurrency = 5
+    const concurrency = 5;
+    for (let i = 0; i < concurrency; i++) {
+      setTimeout(() => this.crawlNext(), i * 150);
+    }
   }
 
   async crawlNext() {
     if (!this.crawling) return;
 
-    if (this.queue.length === 0 || this.crawledPages.size >= this.maxPages) {
+    if (this.queue.length === 0) {
+      // Check if there are any active pages currently loading
+      const isStillLoading = Array.from(this.crawledPages.values()).some(p => p.status === 'loading');
+      if (!isStillLoading) {
+        this.finish();
+      }
+      return;
+    }
+
+    if (this.crawledPages.size >= this.maxPages) {
       this.finish();
       return;
     }
 
     const currentUrl = this.queue.shift();
+    if (!currentUrl) {
+      // Small pause if queue shifts empty but queue.length is non-zero
+      setTimeout(() => this.crawlNext(), 100);
+      return;
+    }
     const normalized = normalizeUrl(currentUrl);
 
     if (!normalized || this.crawledPages.has(normalized)) {
@@ -463,6 +480,7 @@ export class SiteCrawler {
   }
 
   finish() {
+    if (!this.crawling) return;
     this.crawling = false;
     if (this.onFinished) {
       this.onFinished(Array.from(this.crawledPages.values()));
