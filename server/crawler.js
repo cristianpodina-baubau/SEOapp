@@ -348,10 +348,10 @@ export class SiteCrawler {
     this.crawling = true;
     this.queue.push(this.startUrl);
     
-    // Start crawl loop with concurrency = 5
-    const concurrency = 5;
+    // Start crawl loop with concurrency = 3 (gentle and fast)
+    const concurrency = 3;
     for (let i = 0; i < concurrency; i++) {
-      setTimeout(() => this.crawlNext(), i * 150);
+      setTimeout(() => this.crawlNext(), i * 200);
     }
   }
 
@@ -492,8 +492,7 @@ export class SiteCrawler {
       const stats = {
         totalCrawled: this.crawledPages.size,
         crawling: this.crawling,
-        queueLength: this.queue.length,
-        pages: Array.from(this.crawledPages.values())
+        queueLength: this.queue.length
       };
       this.onProgress(stats);
     }
