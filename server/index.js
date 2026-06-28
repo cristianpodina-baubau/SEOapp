@@ -25,7 +25,8 @@ import {
   saveUsers,
   getAdminTokens,
   saveAdminTokens,
-  initDb
+  initDb,
+  getDbColumns
 } from './db.js';
 
 dotenv.config();
@@ -136,6 +137,15 @@ app.get('/api/pagespeed', async (req, res) => {
       opportunities: opportunities.slice(0, 4),
       isSimulated: true
     });
+  }
+});
+
+app.get('/api/diagnose-db', async (req, res) => {
+  try {
+    const columns = await getDbColumns('project_data');
+    res.json(columns);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -338,3 +338,19 @@ export async function saveAdminTokens(tokens) {
   // JSON Fallback
   fs.writeFileSync(GOOGLE_TOKENS_FILE, JSON.stringify(tokens, null, 2));
 }
+
+export async function getDbColumns(tableName) {
+  if (pool) {
+    try {
+      const res = await pool.query(`
+        SELECT column_name, data_type, character_maximum_length 
+        FROM information_schema.columns 
+        WHERE table_name = $1
+      `, [tableName]);
+      return res.rows;
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+  return { error: 'Database pool not initialized.' };
+}
