@@ -232,9 +232,23 @@ app.get('/api/crawl/stream', (req, res) => {
     });
   };
 
-  crawler.onPageCrawled = (page) => {
+  crawler.onPageCrawled = async (page) => {
     console.log(`[Crawler] Scanat cu succes: ${page.url} (Scor: ${page.score}, Status: ${page.statusCode || 200})`);
     activeCrawl.pages.push(page);
+
+    // Incremental save to database every 25 pages to prevent data loss
+    if (projectId && activeCrawl.pages.length % 25 === 0) {
+      try {
+        const projectData = await getProjectData(projectId);
+        projectData.pages = [...activeCrawl.pages];
+        projectData.lastCrawlTime = new Date().toISOString();
+        await saveProjectData(projectId, projectData);
+        console.log(`[Crawler] Salvare incrementală realizată în DB: ${activeCrawl.pages.length} pagini pentru ${projectId}`);
+      } catch (err) {
+        console.error(`[Crawler Error] Eșec la salvarea incrementală în DB:`, err.message);
+      }
+    }
+
     activeCrawl.listeners.forEach(listener => {
       try {
         listener.write(`data: ${JSON.stringify({ type: 'page', page })}\n\n`);
