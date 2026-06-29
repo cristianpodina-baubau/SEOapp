@@ -20,6 +20,7 @@ import {
   saveProjects,
   getProjectData,
   saveProjectData,
+  saveProjectPagesIncremental,
   deleteProjectFiles,
   getUsers,
   saveUsers,
@@ -237,13 +238,10 @@ app.get('/api/crawl/stream', (req, res) => {
     console.log(`[Crawler] Scanat cu succes: ${page.url} (Scor: ${page.score}, Status: ${page.statusCode || 200})`);
     activeCrawl.pages.push(page);
 
-    // Incremental save to database every 25 pages to prevent data loss
-    if (projectId && activeCrawl.pages.length % 25 === 0) {
+    // Incremental save to database every 100 pages to prevent data loss
+    if (projectId && activeCrawl.pages.length % 100 === 0) {
       try {
-        const projectData = await getProjectData(projectId);
-        projectData.pages = [...activeCrawl.pages];
-        projectData.lastCrawlTime = new Date().toISOString();
-        await saveProjectData(projectId, projectData);
+        await saveProjectPagesIncremental(projectId, activeCrawl.pages);
         console.log(`[Crawler] Salvare incrementală realizată în DB: ${activeCrawl.pages.length} pagini pentru ${projectId}`);
       } catch (err) {
         console.error(`[Crawler Error] Eșec la salvarea incrementală în DB:`, err.message);
@@ -271,9 +269,30 @@ app.get('/api/crawl/stream', (req, res) => {
           projectData.history = [];
         }
         
+        const compactPages = pages.map(p => {
+          if (!p) return null;
+          const missingAlt = p.images ? p.images.filter(img => !img.hasAlt).length : 0;
+          return {
+            url: p.url,
+            score: p.score || 0,
+            status: p.status || 'success',
+            statusCode: p.statusCode || 200,
+            wordCount: p.wordCount || 0,
+            title: p.title || '',
+            description: p.description || '',
+            canonical: p.canonical || '',
+            h1s: new Array(p.h1s ? p.h1s.length : 0).fill(''),
+            images: [
+              ...new Array(missingAlt).fill({ hasAlt: false }),
+              ...new Array(p.images ? Math.max(0, p.images.length - missingAlt) : 0).fill({ hasAlt: true })
+            ],
+            fetchTimeMs: p.fetchTimeMs || 0
+          };
+        }).filter(Boolean);
+
         projectData.history.push({
           timestamp: new Date().toISOString(),
-          pages: pages
+          pages: compactPages
         });
         
         if (projectData.history.length > 5) {

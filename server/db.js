@@ -79,6 +79,7 @@ export async function initDb() {
     // Ensure todo_list and custom_tasks columns exist in live database
     await client.query('ALTER TABLE project_data ADD COLUMN IF NOT EXISTS todo_list TEXT');
     await client.query('ALTER TABLE project_data ADD COLUMN IF NOT EXISTS custom_tasks TEXT');
+    await client.query('ALTER TABLE project_data ADD COLUMN IF NOT EXISTS history TEXT');
 
     // Create settings table
     await client.query(`
@@ -159,9 +160,9 @@ export async function saveProjects(projects) {
 export async function getProjectData(projectId) {
   if (pool) {
     try {
-      const res = await pool.query('SELECT pages, editor_text as "editorText", target_keywords as "targetKeywords", google_property_id as "googlePropertyId", todo_list as "todoList", custom_tasks as "customTasks" FROM project_data WHERE project_id = $1', [projectId]);
+      const res = await pool.query('SELECT pages, editor_text as "editorText", target_keywords as "targetKeywords", google_property_id as "googlePropertyId", todo_list as "todoList", custom_tasks as "customTasks", history FROM project_data WHERE project_id = $1', [projectId]);
       if (res.rows.length === 0) {
-        return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [] };
+        return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [], history: [] };
       }
       const row = res.rows[0];
       return {
@@ -170,18 +171,19 @@ export async function getProjectData(projectId) {
         targetKeywords: row.targetKeywords || 'seo, optimizare, site',
         googlePropertyId: row.googlePropertyId || '',
         todoList: JSON.parse(row.todoList || '[]'),
-        customTasks: JSON.parse(row.customTasks || '[]')
+        customTasks: JSON.parse(row.customTasks || '[]'),
+        history: JSON.parse(row.history || '[]')
       };
     } catch (e) {
       console.error('[DB getProjectData Error]', e.message);
-      return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [] };
+      return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [], history: [] };
     }
   }
 
   // JSON Fallback
   const filePath = path.join(DATA_DIR, `project_${projectId}.json`);
   if (!fs.existsSync(filePath)) {
-    return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [] };
+    return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [], history: [] };
   }
   try {
     const fallbackData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -191,10 +193,11 @@ export async function getProjectData(projectId) {
       targetKeywords: fallbackData.targetKeywords || 'seo, optimizare, site',
       googlePropertyId: fallbackData.googlePropertyId || '',
       todoList: fallbackData.todoList || [],
-      customTasks: fallbackData.customTasks || []
+      customTasks: fallbackData.customTasks || [],
+      history: fallbackData.history || []
     };
   } catch (e) {
-    return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [] };
+    return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [], history: [] };
   }
 }
 
@@ -204,17 +207,19 @@ export async function saveProjectData(projectId, data) {
       const pagesStr = JSON.stringify(data.pages || []);
       const todoListStr = JSON.stringify(data.todoList || []);
       const customTasksStr = JSON.stringify(data.customTasks || []);
+      const historyStr = JSON.stringify(data.history || []);
       await pool.query(`
-        INSERT INTO project_data (project_id, pages, editor_text, target_keywords, google_property_id, todo_list, custom_tasks)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO project_data (project_id, pages, editor_text, target_keywords, google_property_id, todo_list, custom_tasks, history)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (project_id) DO UPDATE 
         SET pages = EXCLUDED.pages, 
             editor_text = EXCLUDED.editor_text, 
             target_keywords = EXCLUDED.target_keywords, 
             google_property_id = EXCLUDED.google_property_id,
             todo_list = EXCLUDED.todo_list,
-            custom_tasks = EXCLUDED.custom_tasks
-      `, [projectId, pagesStr, data.editorText || '', data.targetKeywords || 'seo, optimizare, site', data.googlePropertyId || '', todoListStr, customTasksStr]);
+            custom_tasks = EXCLUDED.custom_tasks,
+            history = EXCLUDED.history
+      `, [projectId, pagesStr, data.editorText || '', data.targetKeywords || 'seo, optimizare, site', data.googlePropertyId || '', todoListStr, customTasksStr, historyStr]);
       return;
     } catch (e) {
       console.error('[DB saveProjectData Error]', e.message);
@@ -226,6 +231,31 @@ export async function saveProjectData(projectId, data) {
   const filePath = path.join(DATA_DIR, `project_${projectId}.json`);
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
+
+export async function saveProjectPagesIncremental(projectId, pages) {
+  if (pool) {
+    try {
+      const pagesStr = JSON.stringify(pages || []);
+      await pool.query('UPDATE project_data SET pages = $1 WHERE project_id = $2', [pagesStr, projectId]);
+      return;
+    } catch (e) {
+      console.error('[DB saveProjectPagesIncremental Error]', e.message);
+      return;
+    }
+  }
+  // JSON Fallback
+  const filePath = path.join(DATA_DIR, `project_${projectId}.json`);
+  try {
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      data.pages = pages;
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    }
+  } catch (e) {
+    console.error('[Fallback saveProjectPagesIncremental Error]', e.message);
+  }
+}
+
 
 export async function deleteProjectFiles(projectId) {
   if (pool) {
