@@ -1016,15 +1016,47 @@ export default function App() {
       const res = await fetch(`/api/projects/${project.id}/data?userId=${currentUser?.id || ''}`);
       const data = await res.json();
       
-      // Prevent the next state update from triggering database auto-save
-      skipNextTodoSaveRef.current = true;
+      let finalTodoList = data.todoList;
+      let finalCustomTasks = data.customTasks;
+      let hasMigrated = false;
+
+      // Migrate existing localStorage todoList if DB is empty
+      if (!finalTodoList || finalTodoList.length === 0) {
+        try {
+          const localTodo = JSON.parse(localStorage.getItem('seo_todo_list'));
+          if (localTodo && localTodo.length > 0) {
+            finalTodoList = localTodo;
+            hasMigrated = true;
+          }
+        } catch (e) {}
+      }
+
+      // Migrate existing localStorage customTasks if DB is empty
+      if (!finalCustomTasks || finalCustomTasks.length === 0) {
+        try {
+          const localCustom = JSON.parse(localStorage.getItem('seo_custom_tasks'));
+          if (localCustom && localCustom.length > 0) {
+            finalCustomTasks = localCustom;
+            hasMigrated = true;
+          }
+        } catch (e) {}
+      }
+
+      if (hasMigrated) {
+        // Trigger save to DB automatically to persist the migrated data
+        skipNextTodoSaveRef.current = false;
+        console.log('[Migration] Migrated Planner checklist and notes from browser localStorage to database.');
+      } else {
+        // Prevent unnecessary save since DB already had data
+        skipNextTodoSaveRef.current = true;
+      }
       
       setPages(data.pages || []);
       setEditorText(data.editorText || '');
       setTargetKeywords(data.targetKeywords || 'seo, optimizare, site');
       setCrawlHistory(data.history || []);
-      setTodoList(data.todoList || []);
-      setCustomTasks(data.customTasks || []);
+      setTodoList(finalTodoList || []);
+      setCustomTasks(finalCustomTasks || []);
       
       setBacklinksList(data.backlinks || [
         { url: 'https://www.directorweb.ro/detalii/site-ul-tau', anchor: 'Servicii Instalatii', rating: 65, follow: true, status: 'activ', date: '24.06.2026' },
