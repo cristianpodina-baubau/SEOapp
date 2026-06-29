@@ -5696,7 +5696,7 @@ export default function App() {
                       { id: 'all', label: 'Toate', color: 'rgba(255,255,255,0.05)' },
                       { id: 'critical', label: '🔴 Critice', color: 'rgba(239, 68, 68, 0.1)' },
                       { id: 'warning', label: '🟡 Importante', color: 'rgba(245, 158, 11, 0.1)' },
-                      { id: 'info', label: '🟢 Minore / Info', color: 'rgba(16, 185, 129, 0.1)' }
+                      { id: 'info', label: '🟠 Minore / Info', color: 'rgba(249, 115, 22, 0.1)' }
                     ].map(f => (
                       <button
                         key={f.id}
@@ -5738,10 +5738,19 @@ export default function App() {
                             
                             <div style={{ flex: 1, textAlign: 'left' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                                <span className={`status-badge ${
-                                  diag.severity === 'critical' ? 'status-error' : diag.severity === 'warning' ? 'status-warning' : 'status-success'
-                                }`} style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
-                                  {diag.severity === 'critical' ? 'Critic' : diag.severity === 'warning' ? 'Important' : 'Info'}
+                                <span className="status-badge" style={{ 
+                                  fontSize: '0.7rem', 
+                                  padding: '4px 8px', 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px',
+                                  borderRadius: '12px',
+                                  fontWeight: '700',
+                                  color: diag.severity === 'critical' ? '#ef4444' : diag.severity === 'warning' ? '#f59e0b' : '#f97316',
+                                  background: diag.severity === 'critical' ? 'rgba(239, 68, 68, 0.1)' : diag.severity === 'warning' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(249, 115, 22, 0.1)'
+                                }}>
+                                  {diag.severity === 'critical' ? <AlertCircle size={12} /> : diag.severity === 'warning' ? <AlertTriangle size={12} /> : <Info size={12} />}
+                                  {diag.severity === 'critical' ? 'Critic' : diag.severity === 'warning' ? 'Important' : 'Minor'}
                                 </span>
                                 <span style={{ fontSize: '0.85rem', fontWeight: '800', color: diag.severity === 'critical' ? 'var(--error)' : '#fff' }}>
                                   {diag.count} {diag.title}
@@ -5792,10 +5801,19 @@ export default function App() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                  <span className={`status-badge ${
-                                    task.severity === 'critical' ? 'status-error' : task.severity === 'warning' ? 'status-warning' : 'status-success'
-                                  }`} style={{ fontSize: '0.7rem' }}>
-                                    {task.severity === 'critical' ? 'Critic' : task.severity === 'warning' ? 'Important' : 'Info'}
+                                  <span className="status-badge" style={{ 
+                                    fontSize: '0.7rem', 
+                                    padding: '4px 8px', 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    gap: '4px',
+                                    borderRadius: '12px',
+                                    fontWeight: '700',
+                                    color: task.severity === 'critical' ? '#ef4444' : task.severity === 'warning' ? '#f59e0b' : '#f97316',
+                                    background: task.severity === 'critical' ? 'rgba(239, 68, 68, 0.1)' : task.severity === 'warning' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(249, 115, 22, 0.1)'
+                                  }}>
+                                    {task.severity === 'critical' ? <AlertCircle size={12} /> : task.severity === 'warning' ? <AlertTriangle size={12} /> : <Info size={12} />}
+                                    {task.severity === 'critical' ? 'Critic' : task.severity === 'warning' ? 'Important' : 'Minor'}
                                   </span>
                                   <h3 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#fff', textDecoration: task.status === 'done' ? 'line-through' : 'none', opacity: task.status === 'done' ? 0.6 : 1 }}>
                                     {task.count} {task.title}
