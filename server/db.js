@@ -76,6 +76,10 @@ export async function initDb() {
       )
     `);
 
+    // Ensure todo_list and custom_tasks columns exist in live database
+    await client.query('ALTER TABLE project_data ADD COLUMN IF NOT EXISTS todo_list TEXT');
+    await client.query('ALTER TABLE project_data ADD COLUMN IF NOT EXISTS custom_tasks TEXT');
+
     // Create settings table
     await client.query(`
       CREATE TABLE IF NOT EXISTS settings (
@@ -155,32 +159,42 @@ export async function saveProjects(projects) {
 export async function getProjectData(projectId) {
   if (pool) {
     try {
-      const res = await pool.query('SELECT pages, editor_text as "editorText", target_keywords as "targetKeywords", google_property_id as "googlePropertyId" FROM project_data WHERE project_id = $1', [projectId]);
+      const res = await pool.query('SELECT pages, editor_text as "editorText", target_keywords as "targetKeywords", google_property_id as "googlePropertyId", todo_list as "todoList", custom_tasks as "customTasks" FROM project_data WHERE project_id = $1', [projectId]);
       if (res.rows.length === 0) {
-        return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '' };
+        return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [] };
       }
       const row = res.rows[0];
       return {
         pages: JSON.parse(row.pages),
         editorText: row.editorText || '',
         targetKeywords: row.targetKeywords || 'seo, optimizare, site',
-        googlePropertyId: row.googlePropertyId || ''
+        googlePropertyId: row.googlePropertyId || '',
+        todoList: JSON.parse(row.todoList || '[]'),
+        customTasks: JSON.parse(row.customTasks || '[]')
       };
     } catch (e) {
       console.error('[DB getProjectData Error]', e.message);
-      return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '' };
+      return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [] };
     }
   }
 
   // JSON Fallback
   const filePath = path.join(DATA_DIR, `project_${projectId}.json`);
   if (!fs.existsSync(filePath)) {
-    return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '' };
+    return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [] };
   }
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const fallbackData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    return {
+      pages: fallbackData.pages || [],
+      editorText: fallbackData.editorText || '',
+      targetKeywords: fallbackData.targetKeywords || 'seo, optimizare, site',
+      googlePropertyId: fallbackData.googlePropertyId || '',
+      todoList: fallbackData.todoList || [],
+      customTasks: fallbackData.customTasks || []
+    };
   } catch (e) {
-    return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '' };
+    return { pages: [], editorText: '', targetKeywords: 'seo, optimizare, site', googlePropertyId: '', todoList: [], customTasks: [] };
   }
 }
 
@@ -188,19 +202,22 @@ export async function saveProjectData(projectId, data) {
   if (pool) {
     try {
       const pagesStr = JSON.stringify(data.pages || []);
+      const todoListStr = JSON.stringify(data.todoList || []);
+      const customTasksStr = JSON.stringify(data.customTasks || []);
       await pool.query(`
-        INSERT INTO project_data (project_id, pages, editor_text, target_keywords, google_property_id)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO project_data (project_id, pages, editor_text, target_keywords, google_property_id, todo_list, custom_tasks)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (project_id) DO UPDATE 
         SET pages = EXCLUDED.pages, 
             editor_text = EXCLUDED.editor_text, 
             target_keywords = EXCLUDED.target_keywords, 
-            google_property_id = EXCLUDED.google_property_id
-      `, [projectId, pagesStr, data.editorText || '', data.targetKeywords || 'seo, optimizare, site', data.googlePropertyId || '']);
+            google_property_id = EXCLUDED.google_property_id,
+            todo_list = EXCLUDED.todo_list,
+            custom_tasks = EXCLUDED.custom_tasks
+      `, [projectId, pagesStr, data.editorText || '', data.targetKeywords || 'seo, optimizare, site', data.googlePropertyId || '', todoListStr, customTasksStr]);
       return;
     } catch (e) {
       console.error('[DB saveProjectData Error]', e.message);
-      dbErrors.push({ timestamp: new Date().toISOString(), action: 'saveProjectData', error: e.message, stack: e.stack });
       return;
     }
   }

@@ -804,34 +804,42 @@ export default function App() {
   const [selectedReportFilter, setSelectedReportFilter] = useState('all');
 
   // To-Do States
-  const [todoList, setTodoList] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('seo_todo_list') || '[]');
-    } catch (e) {
-      return [];
-    }
-  });
+  const [todoList, setTodoList] = useState([]);
   const [todoSeverityFilter, setTodoSeverityFilter] = useState('all');
   const [todoActiveTab, setTodoActiveTab] = useState('select');
-  const [customTasks, setCustomTasks] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('seo_custom_tasks') || '[]');
-    } catch (e) {
-      return [];
-    }
-  });
+  const [customTasks, setCustomTasks] = useState([]);
   const [aiTaskGoal, setAiTaskGoal] = useState('');
   const [isGeneratingAiTasks, setIsGeneratingAiTasks] = useState(false);
   const [generatedAiTasks, setGeneratedAiTasks] = useState(null);
   const [aiTaskStep, setAiTaskStep] = useState('');
   
-  useEffect(() => {
-    localStorage.setItem('seo_todo_list', JSON.stringify(todoList));
-  }, [todoList]);
+  const skipNextTodoSaveRef = useRef(false);
 
   useEffect(() => {
-    localStorage.setItem('seo_custom_tasks', JSON.stringify(customTasks));
-  }, [customTasks]);
+    if (!activeProject) return;
+
+    if (skipNextTodoSaveRef.current) {
+      skipNextTodoSaveRef.current = false;
+      return;
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      try {
+        await fetch(`/api/projects/${activeProject.id}/data?userId=${currentUser?.id || ''}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            todoList,
+            customTasks
+          })
+        });
+      } catch (err) {
+        console.error('Error auto-saving todo/tasks:', err);
+      }
+    }, 1000);
+
+    return () => clearTimeout(delayDebounce);
+  }, [todoList, customTasks, activeProject]);
 
   const [showScrollTop, setShowScrollTop] = useState(false);
   const mainContentRef = useRef(null);
@@ -1007,10 +1015,17 @@ export default function App() {
     try {
       const res = await fetch(`/api/projects/${project.id}/data?userId=${currentUser?.id || ''}`);
       const data = await res.json();
+      
+      // Prevent the next state update from triggering database auto-save
+      skipNextTodoSaveRef.current = true;
+      
       setPages(data.pages || []);
       setEditorText(data.editorText || '');
       setTargetKeywords(data.targetKeywords || 'seo, optimizare, site');
       setCrawlHistory(data.history || []);
+      setTodoList(data.todoList || []);
+      setCustomTasks(data.customTasks || []);
+      
       setBacklinksList(data.backlinks || [
         { url: 'https://www.directorweb.ro/detalii/site-ul-tau', anchor: 'Servicii Instalatii', rating: 65, follow: true, status: 'activ', date: '24.06.2026' },
         { url: 'https://forum.constructii.ro/viewtopic.php?p=102', anchor: 'pompe de caldura', rating: 45, follow: true, status: 'activ', date: '20.06.2026' },
