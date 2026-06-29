@@ -813,6 +813,38 @@ app.post('/api/projects/:id/data', async (req, res) => {
   }
 });
 
+app.get('/api/test-connection', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'Missing url parameter.' });
+
+  const start = Date.now();
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7'
+      },
+      timeout: 10000
+    });
+    res.json({
+      success: true,
+      statusCode: response.status,
+      timeMs: Date.now() - start,
+      contentType: response.headers['content-type'],
+      htmlSnippet: typeof response.data === 'string' ? response.data.slice(0, 1000) : 'Non-string data'
+    });
+  } catch (err) {
+    res.json({
+      success: false,
+      timeMs: Date.now() - start,
+      message: err.message,
+      statusCode: err.response ? err.response.status : 0,
+      headers: err.response ? err.response.headers : null
+    });
+  }
+});
+
 // Auto-deployment Webhook from GitHub
 app.post('/api/deploy-webhook', (req, res) => {
   console.log('[Webhook] Actualizare detectată pe GitHub. Se pornește descărcarea codului...');
