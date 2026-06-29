@@ -815,31 +815,25 @@ export default function App() {
   
   const skipNextTodoSaveRef = useRef(false);
 
-  useEffect(() => {
+  const saveTodoAndTasksDirect = async (currentTodoList, currentCustomTasks) => {
+    // Sync to localStorage as fallback
+    localStorage.setItem('seo_todo_list', JSON.stringify(currentTodoList || []));
+    localStorage.setItem('seo_custom_tasks', JSON.stringify(currentCustomTasks || []));
+
     if (!activeProject) return;
-
-    if (skipNextTodoSaveRef.current) {
-      skipNextTodoSaveRef.current = false;
-      return;
+    try {
+      await fetch(`/api/projects/${activeProject.id}/data?userId=${currentUser?.id || ''}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          todoList: currentTodoList,
+          customTasks: currentCustomTasks
+        })
+      });
+    } catch (err) {
+      console.error('Error saving todo/tasks:', err);
     }
-
-    const delayDebounce = setTimeout(async () => {
-      try {
-        await fetch(`/api/projects/${activeProject.id}/data?userId=${currentUser?.id || ''}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            todoList,
-            customTasks
-          })
-        });
-      } catch (err) {
-        console.error('Error auto-saving todo/tasks:', err);
-      }
-    }, 1000);
-
-    return () => clearTimeout(delayDebounce);
-  }, [todoList, customTasks, activeProject]);
+  };
 
   const [showScrollTop, setShowScrollTop] = useState(false);
   const mainContentRef = useRef(null);
@@ -1057,6 +1051,9 @@ export default function App() {
       setCrawlHistory(data.history || []);
       setTodoList(finalTodoList || []);
       setCustomTasks(finalCustomTasks || []);
+      // Sync to localStorage
+      localStorage.setItem('seo_todo_list', JSON.stringify(finalTodoList || []));
+      localStorage.setItem('seo_custom_tasks', JSON.stringify(finalCustomTasks || []));
       
       setBacklinksList(data.backlinks || [
         { url: 'https://www.directorweb.ro/detalii/site-ul-tau', anchor: 'Servicii Instalatii', rating: 65, follow: true, status: 'activ', date: '24.06.2026' },
@@ -5627,10 +5624,11 @@ export default function App() {
           // Handlers to toggle task selection
           const toggleTask = (issue) => {
             const exists = todoList.find(t => t.id === issue.id);
+            let updated;
             if (exists) {
-              setTodoList(todoList.filter(t => t.id !== issue.id));
+              updated = todoList.filter(t => t.id !== issue.id);
             } else {
-              setTodoList([...todoList, {
+              updated = [...todoList, {
                 id: issue.id,
                 title: issue.title,
                 severity: issue.severity,
@@ -5638,16 +5636,22 @@ export default function App() {
                 status: 'todo', // 'todo', 'in_progress', 'done'
                 notes: '',
                 addedAt: Date.now()
-              }]);
+              }];
             }
+            setTodoList(updated);
+            saveTodoAndTasksDirect(updated, customTasks);
           };
 
           const updateTaskStatus = (id, newStatus) => {
-            setTodoList(todoList.map(t => t.id === id ? { ...t, status: newStatus } : t));
+            const updated = todoList.map(t => t.id === id ? { ...t, status: newStatus } : t);
+            setTodoList(updated);
+            saveTodoAndTasksDirect(updated, customTasks);
           };
 
           const updateTaskNotes = (id, newNotes) => {
-            setTodoList(todoList.map(t => t.id === id ? { ...t, notes: newNotes } : t));
+            const updated = todoList.map(t => t.id === id ? { ...t, notes: newNotes } : t);
+            setTodoList(updated);
+            saveTodoAndTasksDirect(updated, customTasks);
           };
 
           // To-Do list status counts
@@ -5935,7 +5939,11 @@ export default function App() {
                               <button 
                                 className="btn btn-outline" 
                                 style={{ padding: '4px 10px', fontSize: '0.72rem', color: 'var(--error)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                                onClick={() => setTodoList(todoList.filter(t => t.id !== task.id))}
+                                onClick={() => {
+                                  const updated = todoList.filter(t => t.id !== task.id);
+                                  setTodoList(updated);
+                                  saveTodoAndTasksDirect(updated, customTasks);
+                                }}
                               >
                                 Șterge din Plan
                               </button>
@@ -6395,7 +6403,9 @@ export default function App() {
                                 completed: false,
                                 addedAt: Date.now()
                               }));
-                              setCustomTasks([...customTasks, ...newTasks]);
+                              const updated = [...customTasks, ...newTasks];
+                              setCustomTasks(updated);
+                              saveTodoAndTasksDirect(todoList, updated);
                               setGeneratedAiTasks(null);
                               setAiTaskGoal('');
                             }}
@@ -6432,12 +6442,14 @@ export default function App() {
                         e.preventDefault();
                         const input = e.target.elements.taskInput;
                         if (!input.value.trim()) return;
-                        setCustomTasks([...customTasks, {
+                        const updated = [...customTasks, {
                           id: 'task_' + Math.random().toString(36).substr(2, 9),
                           text: input.value.trim(),
                           completed: false,
                           addedAt: Date.now()
-                        }]);
+                        }];
+                        setCustomTasks(updated);
+                        saveTodoAndTasksDirect(todoList, updated);
                         input.value = '';
                       }}
                       style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}
@@ -6478,7 +6490,9 @@ export default function App() {
                                 style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }}
                                 checked={task.completed}
                                 onChange={() => {
-                                  setCustomTasks(customTasks.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t));
+                                  const updated = customTasks.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t);
+                                  setCustomTasks(updated);
+                                  saveTodoAndTasksDirect(todoList, updated);
                                 }}
                               />
                               <span style={{ 
@@ -6503,7 +6517,11 @@ export default function App() {
                                 marginLeft: '12px',
                                 flexShrink: 0
                               }}
-                              onClick={() => setCustomTasks(customTasks.filter(t => t.id !== task.id))}
+                              onClick={() => {
+                                const updated = customTasks.filter(t => t.id !== task.id);
+                                setCustomTasks(updated);
+                                saveTodoAndTasksDirect(todoList, updated);
+                              }}
                             >
                               Șterge
                             </button>
