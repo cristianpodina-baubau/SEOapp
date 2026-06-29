@@ -400,7 +400,9 @@ export class SiteCrawler {
     try {
       const response = await axios.get(normalized, {
         headers: {
-          'User-Agent': 'SEOapp-Crawler/1.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7'
         },
         timeout: 10000,
         maxContentLength: 5 * 1024 * 1024 // limit 5MB
