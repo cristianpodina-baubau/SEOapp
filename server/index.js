@@ -55,7 +55,8 @@ app.get('/api/pagespeed', async (req, res) => {
 
   try {
     console.log(`[PageSpeed API] Se rulează testul real pentru: ${url}`);
-    const googleApiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&category=performance&strategy=mobile`;
+    const keyParam = process.env.PAGESPEED_API_KEY ? `&key=${process.env.PAGESPEED_API_KEY}` : '';
+    const googleApiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&category=performance&strategy=mobile${keyParam}`;
     const response = await axios.get(googleApiUrl);
     const data = response.data;
     
